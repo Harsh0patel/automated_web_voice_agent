@@ -55,6 +55,8 @@ def mock_soniox_client():
         mock_transcript = MagicMock()
         mock_transcript.text = "Hello, this is a test transcription."
         instance.stt.transcribe_and_wait_with_tokens.return_value = mock_transcript
+        # Set up TTS mock so synthesize_speech works in tests
+        instance.tts.generate_to_file = AsyncMock(return_value=None)
         yield mock
 
 

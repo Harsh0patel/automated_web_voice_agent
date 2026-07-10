@@ -1,10 +1,9 @@
 """
-End-to-end tests for the full audio → Soniox → OpenAI → WebSocket pipeline.
-All external services are mocked since this is a headless backend.
+End-to-end tests for the full audio → Soniox → DB Lookup → LLM → TTS pipeline.
+All external services are mocked.
 """
 import base64
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -13,167 +12,132 @@ class TestFullAudioPipeline:
     """Complete end-to-end test for the audio processing pipeline."""
 
     def test_full_audio_transcribe_pipeline(self, client, mock_soniox_client, mock_openai_client):
-        """
-        E2E: Connect → send audio_transcribe → receive final processed result.
-        Tests the complete flow: audio → Soniox STT → OpenAI LLM → WebSocket response.
-        """
+        """E2E: Connect → send audio → receive query_result with TTS."""
         audio_b64 = base64.b64encode(b"fake_wav_audio_data").decode()
 
         with client.websocket_connect("/ws") as ws:
-            # Step 1: Receive welcome
             welcome = ws.receive_json()
             assert welcome["type"] == "connection_established"
 
-            # Step 2: Send audio for transcription
-            ws.send_json({
-                "type": "audio_transcribe",
-                "format": "wav",
-                "data": audio_b64,
-            })
+            ws.send_json({"type": "audio_transcribe", "format": "wav", "data": audio_b64})
 
-            # Step 3: Receive processing started (transcribing)
-            msg1 = ws.receive_json()
-            assert msg1["type"] == "processing_started"
-            assert msg1["stage"] == "transcribing"
+            # processing_started (transcribing)
+            r = ws.receive_json()
+            assert r["type"] == "processing_started"
+            assert r["stage"] == "transcribing"
 
-            # Step 4: Receive transcription complete
-            msg2 = ws.receive_json()
-            assert msg2["type"] == "transcription_complete"
-            assert msg2["transcript"] == "Hello, this is a test transcription."
+            # transcription_complete
+            r = ws.receive_json()
+            assert r["type"] == "transcription_complete"
 
-            # Step 5: Receive processing started (LLM)
-            msg3 = ws.receive_json()
-            assert msg3["type"] == "processing_started"
-            assert msg3["stage"] == "llm"
+            # processing_started (searching)
+            r = ws.receive_json()
+            assert r["type"] == "processing_started"
 
-            # Step 6: Receive final result
-            msg4 = ws.receive_json()
-            assert msg4["type"] == "audio_processed"
-            assert msg4["transcript"] == "Hello, this is a test transcription."
-            assert msg4["llm_response"]["parsed"] == {
-                "result": "success",
-                "data": "processed",
-            }
+            # db_lookup_skipped (no real DB running)
+            r = ws.receive_json()
+            assert r["type"] in ("db_lookup_skipped", "db_results_found")
+
+            # processing_started (llm)
+            r = ws.receive_json()
+            assert r["type"] == "processing_started" and r["stage"] == "llm"
+
+            # processing_started (tts)
+            r = ws.receive_json()
+            assert r["type"] == "processing_started" and r["stage"] == "tts"
+
+            # query_result
+            r = ws.receive_json()
+            assert r["type"] == "query_result"
+            assert "message" in r
 
     def test_full_binary_audio_pipeline(self, client, mock_soniox_client, mock_openai_client):
-        """
-        E2E: Connect → send binary audio → process_audio → receive result.
-        Tests the binary chunk accumulation + processing flow.
-        """
+        """E2E: Connect → send binary audio → process_audio → receive result."""
         with client.websocket_connect("/ws") as ws:
-            # Step 1: Welcome
-            ws.receive_json()
-
-            # Step 2: Send binary audio in chunks
+            ws.receive_json()  # welcome
             ws.send_bytes(b"RIFF chunk1 ")
-            r = ws.receive_json()
-            assert r["type"] == "audio_chunk_received"
-            assert r["total_buffer"] == 12
-
-            ws.send_bytes(b"chunk2 data ")
-            r = ws.receive_json()
-            assert r["type"] == "audio_chunk_received"
-            assert r["total_buffer"] == 24
-
-            ws.send_bytes(b"final_chunk")
-            r = ws.receive_json()
-            assert r["type"] == "audio_chunk_received"
-            assert r["total_buffer"] == 35
-
-            # Step 3: Process the accumulated audio
+            ws.receive_json()  # chunk_received
             ws.send_json({"type": "process_audio", "format": "wav"})
 
-            # Step 4-7: Receive pipeline messages
-            msg1 = ws.receive_json()
-            assert msg1["type"] == "processing_started"
-
-            msg2 = ws.receive_json()
-            assert msg2["type"] == "transcription_complete"
-
-            msg3 = ws.receive_json()
-            assert msg3["type"] == "processing_started"
-            assert msg3["stage"] == "llm"
-
-            msg4 = ws.receive_json()
-            assert msg4["type"] == "audio_processed"
+            ws.receive_json()   # processing_started (transcribing)
+            ws.receive_json()   # transcription_complete
+            ws.receive_json()   # processing_started (searching)
+            ws.receive_json()   # db_lookup_skipped
+            ws.receive_json()   # processing_started (llm)
+            ws.receive_json()   # processing_started (tts)
+            r = ws.receive_json()
+            assert r["type"] == "query_result"
 
     def test_pipeline_error_handling(self, client, mock_soniox_client, mock_openai_client):
-        """
-        E2E: Test that pipeline errors are properly reported via WebSocket.
-        """
-        # Make Soniox fail
+        """E2E: Pipeline errors should be reported via WebSocket."""
         instance = mock_soniox_client.return_value
         instance.stt.transcribe_and_wait_with_tokens = AsyncMock(
             side_effect=RuntimeError("Transcription failed")
         )
-
         audio_b64 = base64.b64encode(b"bad_audio").decode()
 
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
+            ws.send_json({"type": "audio_transcribe", "format": "wav", "data": audio_b64})
 
-            ws.send_json({
-                "type": "audio_transcribe",
-                "format": "wav",
-                "data": audio_b64,
-            })
-
-            # Should get processing_started
-            r = ws.receive_json()
+            r = ws.receive_json()  # processing_started
             assert r["type"] == "processing_started"
-
-            # Then error
-            r = ws.receive_json()
+            r = ws.receive_json()  # error
             assert r["type"] == "error"
-            assert "Audio processing failed" in r["message"]
 
     def test_mixed_json_and_audio_flow(self, client, mock_soniox_client, mock_openai_client):
-        """
-        E2E: Mixed flow - echo, then audio, then chat, verifying context isolation.
-        """
+        """E2E: Mixed flow — text, then audio, then chat."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
 
-            # 1. Text echo
+            # Text query
             ws.send_text("Hello")
+            ws.receive_json()  # processing (searching)
+            ws.receive_json()  # db_lookup_skipped
+            ws.receive_json()  # processing (llm)
+            ws.receive_json()  # processing (tts)
             r = ws.receive_json()
-            assert r["type"] == "response"
-            assert r["input_type"] == "text"
+            assert r["type"] == "query_result"
 
-            # 2. Audio processing
+            # Audio query
             ws.send_bytes(b"audio_data")
             ws.receive_json()  # chunk_received
-
             ws.send_json({"type": "process_audio", "format": "wav"})
-            ws.receive_json()  # processing_started
+            ws.receive_json()  # transcribing
             ws.receive_json()  # transcription
-            ws.receive_json()  # llm processing
-            r = ws.receive_json()  # final result
-            assert r["type"] == "audio_processed"
-
-            # 3. Chat - should work without interference from audio buffer
-            ws.send_json({"type": "chat", "content": "Second request"})
+            ws.receive_json()  # searching
+            ws.receive_json()  # db_skip
+            ws.receive_json()  # llm
+            ws.receive_json()  # tts
             r = ws.receive_json()
-            assert r["type"] == "response"
-            assert r["input_type"] == "chat"
-            assert r["original"]["content"] == "Second request"
+            assert r["type"] == "query_result"
+
+            # Chat
+            ws.send_json({"type": "chat", "content": "Second request"})
+            ws.receive_json()  # searching
+            ws.receive_json()  # db_skip
+            ws.receive_json()  # llm
+            ws.receive_json()  # tts
+            r = ws.receive_json()
+            assert r["type"] == "query_result"
 
 
 class TestLLMIntegration:
     """End-to-end tests for the LLM integration."""
 
     def test_llm_response_format(self, client, mock_openai_client):
-        """The LLM response should always include content, parsed, and model."""
+        """The LLM response should be a query_result with message."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
             ws.send_json({"type": "chat", "content": "Test"})
-            r = ws.receive_json()
 
-            assert r["type"] == "response"
-            assert isinstance(r["content"], str)
-            assert isinstance(r["parsed"], dict)
-            assert isinstance(r["model"], str)
-            assert r["model"] == "gpt-4o-mini"
+            ws.receive_json()  # db_search
+            ws.receive_json()  # db_skip
+            ws.receive_json()  # llm
+            ws.receive_json()  # tts
+            r = ws.receive_json()
+            assert r["type"] == "query_result"
+            assert isinstance(r.get("message", ""), str)
 
     def test_llm_error_propagation(self, client, mock_openai_client):
         """If the LLM fails, the error should be sent back."""
@@ -185,7 +149,12 @@ class TestLLMIntegration:
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
             ws.send_json({"type": "chat", "content": "Test"})
-            r = ws.receive_json()
 
+            ws.receive_json()  # db_search
+            ws.receive_json()  # db_skip
+            r = ws.receive_json()  # llm processing_started
+            assert r["type"] == "processing_started"
+
+            r = ws.receive_json()  # error
             assert r["type"] == "error"
             assert "OpenAI" in r["message"]

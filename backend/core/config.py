@@ -8,6 +8,9 @@ SONIOX_API_KEY: str = os.getenv("SONIOX_API_KEY", "")
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
+# MongoDB config
+MONGO_URI: str = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+
 # Paths
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 PROMPT_FILE: Path = PROJECT_ROOT / "backend" / "core" / "prompts" / "system_prompt.txt"
