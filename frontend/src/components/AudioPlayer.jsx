@@ -20,9 +20,9 @@ export default function AudioPlayer({ visible, blob, onClose }) {
     // Revoke old URL
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
 
-    const url = URL.createObjectURL(blob);
-    urlRef.current = url;
-    const audio = new Audio(url);
+    const objectUrl = URL.createObjectURL(blob);
+    urlRef.current = objectUrl;
+    const audio = new Audio(objectUrl);
     audioRef.current = audio;
 
     audio.onloadedmetadata = () => {
@@ -51,12 +51,12 @@ export default function AudioPlayer({ visible, blob, onClose }) {
   }, [visible, blob]);
 
   function togglePlay() {
-    const a = audioRef.current;
-    if (!a) return;
+    const audioElem = audioRef.current;
+    if (!audioElem) return;
     if (playing) {
-      a.pause();
+      audioElem.pause();
     } else {
-      a.play();
+      audioElem.play();
     }
     setPlaying(!playing);
   }

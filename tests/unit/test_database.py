@@ -8,8 +8,8 @@ import pytest
 class TestGetClient:
     """Tests for _get_client and get_db functions."""
 
-    def test_get_client_raises_without_uri(self, monkeypatch):
-        """Without MONGO_URI, should raise ValueError."""
+    def test_get_client_returns_none_without_uri(self, monkeypatch):
+        """Without MONGO_URI, _get_client should return None (not crash)."""
         from backend.core import database as db
         # Reset global client to force re-initialization
         db._client = None
@@ -19,8 +19,8 @@ class TestGetClient:
         cfg.MONGO_URI = ""
 
         try:
-            with pytest.raises(ValueError, match="MONGO_URI is not set"):
-                db._get_client()
+            result = db._get_client()
+            assert result is None, "Should return None when MONGO_URI is empty"
         finally:
             cfg.MONGO_URI = original
 

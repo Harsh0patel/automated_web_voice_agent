@@ -32,6 +32,12 @@ export default function App() {
     localStorage.setItem(STORAGE_THEME, isDark ? 'dark' : 'light');
   }, [isDark]);
 
+  // --- Messages (defined FIRST so useCallback deps below can reference it) ---
+  const addMessage = useCallback((role, text, sources) => {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setMessages(prev => [...prev, { role, text, time, sources: sources || [] }]);
+  }, []);
+
   // --- WebSocket handler ---
   const handleWsMessage = useCallback((data) => {
     if (data.type === '__audio__') {
@@ -86,10 +92,15 @@ export default function App() {
     onStatusChange: handleWsStatus,
   });
 
-  // --- Messages ---
-  const addMessage = useCallback((role, text, sources) => {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setMessages(prev => [...prev, { role, text, time, sources: sources || [] }]);
+  // --- Pages (defined before scrapeUrl which calls loadPages) ---
+  const loadPages = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/pages`);
+      const data = await res.json();
+      setPages(data.pages || []);
+    } catch {
+      // DB might not be running
+    }
   }, []);
 
   // --- Send text ---
@@ -179,17 +190,6 @@ export default function App() {
       setScrapeStatus(`❌ ${err.message}`);
     }
   }, [addMessage]);
-
-  // --- Pages ---
-  const loadPages = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/pages`);
-      const data = await res.json();
-      setPages(data.pages || []);
-    } catch {
-      // DB might not be running
-    }
-  }, []);
 
   const clearPages = useCallback(async () => {
     try {

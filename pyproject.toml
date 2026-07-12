@@ -4,6 +4,7 @@ dev = [
     "fastapi>=0.139.0",
     "httpx>=0.28.1",
     "motor>=3.7.1",
+    "python-dotenv>=1.0.0",
     "openai>=2.44.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

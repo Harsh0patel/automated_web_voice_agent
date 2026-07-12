@@ -12,31 +12,39 @@ logger = get_logger(__name__)
 _client: AsyncIOMotorClient | None = None
 
 
-def _get_client() -> AsyncIOMotorClient:
-    """Get or create the MongoDB client singleton."""
+def _get_client() -> AsyncIOMotorClient | None:
+    """Get or create the MongoDB client singleton. Returns None if unavailable."""
     global _client
     if _client is None:
         mongo_uri = cfg.MONGO_URI
         if not mongo_uri:
-            logger.error("MONGO_URI not set")
-            raise ValueError(
-                "MONGO_URI is not set. "
-                "Set the MONGO_URI environment variable (e.g. mongodb://localhost:27017)."
+            logger.error("MONGO_URI not set — DB features disabled")
+            return None
+        try:
+            _client = AsyncIOMotorClient(
+                mongo_uri,
+                serverSelectionTimeoutMS=3000,  # fail fast if Mongo is down
+                connectTimeoutMS=3000,
             )
-        _client = AsyncIOMotorClient(mongo_uri)
-        # Safely log URI without exposing credentials
-        if "@" in mongo_uri:
-            _, host = mongo_uri.split("@", 1)
-            safe_uri = f"mongodb://***@{host}"
-        else:
-            safe_uri = mongo_uri
-        logger.info("MongoDB client created — %s", safe_uri)
+            # Safely log URI without exposing credentials
+            if "@" in mongo_uri:
+                _, host = mongo_uri.split("@", 1)
+                safe_uri = f"mongodb://***@{host}"
+            else:
+                safe_uri = mongo_uri
+            logger.info("MongoDB client created — %s", safe_uri)
+        except Exception as exc:
+            logger.error("Failed to create MongoDB client: %s", exc)
+            _client = None
+            return None
     return _client
 
 
 def get_db():
-    """Get the scraped-data database."""
+    """Get the scraped-data database. Returns None if MongoDB is unavailable."""
     client = _get_client()
+    if client is None:
+        return None
     return client.scraped_data
 
 
@@ -54,6 +62,10 @@ async def store_page(url: str, title: str, content: str, metadata: dict | None =
         The inserted document ID as a string.
     """
     db = get_db()
+    if db is None:
+        logger.warning("MongoDB unavailable — cannot store page '%s'", url)
+        raise ConnectionError("MongoDB is not available")
+
     doc = {
         "url": url,
         "title": title,
@@ -88,6 +100,10 @@ async def search_pages(query: str, limit: int = 5) -> list[dict]:
         List of matching documents with url, title, content, and relevance score.
     """
     db = get_db()
+    if db is None:
+        logger.info("MongoDB unavailable — skipping DB search")
+        return []
+
     logger.debug("Searching pages for: %.80s", query)
 
     cursor = db.pages.find(
@@ -112,6 +128,8 @@ async def search_pages(query: str, limit: int = 5) -> list[dict]:
 async def get_all_pages(limit: int = 20) -> list[dict]:
     """Get all stored pages (for listing)."""
     db = get_db()
+    if db is None:
+        return []
     cursor = db.pages.find().limit(limit)
     results = []
     async for doc in cursor:
@@ -128,6 +146,8 @@ async def get_all_pages(limit: int = 20) -> list[dict]:
 async def delete_all_pages():
     """Delete all stored pages (for testing/cleanup)."""
     db = get_db()
+    if db is None:
+        return 0
     result = await db.pages.delete_many({})
     logger.warning("Deleted %d pages from DB", result.deleted_count)
     return result.deleted_count
@@ -135,8 +155,10 @@ async def delete_all_pages():
 
 async def ping() -> bool:
     """Check if MongoDB is reachable."""
+    client = _get_client()
+    if client is None:
+        return False
     try:
-        client = _get_client()
         await client.admin.command("ping")
         logger.debug("MongoDB ping successful")
         return True

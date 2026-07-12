@@ -32,13 +32,22 @@ async def scrape_and_store(url: str):
     scraped = await scrape_url(url)
     logger.info("Scraped %s — title=%.60s, content=%d chars", url, scraped["title"], len(scraped["content"]))
 
-    doc_id = await db.store_page(
-        url=scraped["url"],
-        title=scraped["title"],
-        content=scraped["content"],
-        metadata=scraped.get("metadata"),
-    )
-    logger.info("Stored scraped page in MongoDB: id=%s", doc_id)
+    try:
+        doc_id = await db.store_page(
+            url=scraped["url"],
+            title=scraped["title"],
+            content=scraped["content"],
+            metadata=scraped.get("metadata"),
+        )
+        logger.info("Stored scraped page in MongoDB: id=%s", doc_id)
+    except (ConnectionError, Exception) as db_err:
+        logger.warning("Failed to store scraped page in DB: %s", db_err)
+        return {
+            "error": f"Scraped successfully but DB storage failed: {db_err}",
+            "url": scraped["url"],
+            "title": scraped["title"],
+            "content_preview": scraped["content"][:300] + ("..." if len(scraped["content"]) > 300 else ""),
+        }
 
     return {
         "id": doc_id,

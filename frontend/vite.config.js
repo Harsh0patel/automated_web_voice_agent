@@ -19,5 +19,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // esbuild minification has a bug with variable renaming in certain React patterns
+    // ("Cannot access 'le' before initialization"). Using 'terser' fixes it.
+    minify: 'terser',
   },
 });

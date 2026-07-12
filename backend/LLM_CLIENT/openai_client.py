@@ -49,23 +49,32 @@ async def generate_json_from_transcript(
     if system_prompt is None:
         system_prompt = await load_system_prompt()
 
-    client = AsyncOpenAI(api_key=cfg.OPENAI_API_KEY)
+    client = AsyncOpenAI(
+        api_key=cfg.OPENAI_API_KEY,
+        base_url=cfg.OPENAI_BASE_URL,
+    )
     model_name = model or cfg.OPENAI_MODEL
+    logger.debug("LLM client: base_url=%s, model=%s", cfg.OPENAI_BASE_URL, model_name)
 
     messages = [
         {"role": "system", "content": system_prompt or "You are a helpful assistant. Respond in JSON format."},
         {"role": "user", "content": transcript},
     ]
 
-    logger.debug("Sending to OpenAI model=%s (%d chars system, %d chars user)",
-                 model_name, len(system_prompt), len(transcript))
+    logger.debug("Sending to LLM model=%s base_url=%s json_mode=%s (%d+%d chars)",
+                 model_name, cfg.OPENAI_BASE_URL, cfg.OPENAI_JSON_MODE,
+                 len(system_prompt), len(transcript))
 
-    response = await client.chat.completions.create(
+    kwargs = dict(
         model=model_name,
         messages=messages,
-        response_format={"type": "json_object"},
         temperature=0.1,
     )
+    # json_object mode is OpenAI-specific; skip it for other providers
+    if cfg.OPENAI_JSON_MODE:
+        kwargs["response_format"] = {"type": "json_object"}
+
+    response = await client.chat.completions.create(**kwargs)
 
     content_raw = response.choices[0].message.content or "{}"
     logger.info("OpenAI response received (%d chars, model=%s)", len(content_raw), model_name)

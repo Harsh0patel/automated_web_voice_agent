@@ -92,6 +92,10 @@ async def _process_query(
             })
         else:
             logger.info("DB lookup returned 0 results for query")
+            await manager.send_json(websocket, {
+                "type": "db_lookup_skipped",
+                "reason": "No relevant pages found in knowledge base.",
+            })
     except Exception as exc:
         db_context = ""
         results = []
