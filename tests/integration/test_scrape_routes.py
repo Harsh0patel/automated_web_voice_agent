@@ -28,16 +28,19 @@ class TestScrapeEndpoint:
         assert response.status_code == 422
 
     @patch("backend.routes.scrape.scrape_url")
+    @patch("backend.routes.scrape.db.store_components")
     @patch("backend.routes.scrape.db.store_page")
-    def test_scrape_success(self, mock_store_page, mock_scrape_url, client):
-        """Successful scrape should store and return the page."""
+    def test_scrape_success(self, mock_store_page, mock_store_components, mock_scrape_url, client):
+        """Successful scrape should store the page and parse components."""
         mock_scrape_url.return_value = {
             "url": "https://example.com",
             "title": "Example Page",
             "content": "This is the page content. " * 50,
+            "raw_html": "<html><body><h1>Hello</h1><p>World</p></body></html>",
             "metadata": {"status_code": 200, "content_length": 500},
         }
         mock_store_page.return_value = "doc123"
+        mock_store_components.return_value = 2
 
         response = client.post("/scrape?url=https://example.com")
         data = response.json()
@@ -47,8 +50,10 @@ class TestScrapeEndpoint:
         assert data["url"] == "https://example.com"
         assert data["title"] == "Example Page"
         assert "content_preview" in data
+        assert data["components_stored"] == 2
         mock_scrape_url.assert_called_once_with("https://example.com")
         mock_store_page.assert_called_once()
+        mock_store_components.assert_called_once()
 
     @patch("backend.routes.scrape.scrape_url")
     def test_scrape_error_propagates(self, mock_scrape_url, app):
@@ -128,3 +133,92 @@ class TestDeletePagesEndpoint:
 
         assert response.status_code == 200
         assert data["deleted"] == 0
+
+
+class TestComponentEndpoints:
+    """Tests for the component registry API endpoints."""
+
+    @patch("backend.routes.scrape.db.get_all_components")
+    @patch("backend.routes.scrape.db.get_component_types")
+    def test_list_components_empty(self, mock_types, mock_components, client):
+        """GET /components should return empty list initially."""
+        mock_components.return_value = []
+        mock_types.return_value = []
+
+        response = client.get("/components")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert data["components"] == []
+        assert data["count"] == 0
+        assert data["types"] == []
+
+    @patch("backend.routes.scrape.db.get_all_components")
+    @patch("backend.routes.scrape.db.get_component_types")
+    def test_list_components_with_data(self, mock_types, mock_components, client):
+        """GET /components should return stored components."""
+        mock_components.return_value = [
+            {"id": "1", "type": "service", "content": "Cardiology", "metadata": {"page_title": "Home", "page_url": "/", "section": "features"}},
+            {"id": "2", "type": "doctor", "content": "Dr. Smith", "metadata": {"page_title": "Doctors", "page_url": "/doctors", "section": "main"}},
+        ]
+        mock_types.return_value = ["service", "doctor"]
+
+        response = client.get("/components")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert len(data["components"]) == 2
+        assert data["count"] == 2
+        assert "service" in data["types"]
+        assert data["components"][0]["type"] == "service"
+
+    @patch("backend.routes.scrape.db.get_component_types")
+    def test_component_types(self, mock_types, client):
+        """GET /components/types should return distinct types."""
+        mock_types.return_value = ["service", "doctor", "faq"]
+
+        response = client.get("/components/types")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert len(data["types"]) == 3
+        assert data["count"] == 3
+
+    @patch("backend.routes.scrape.db.search_components")
+    def test_search_components(self, mock_search, client):
+        """GET /components/search should return matching components."""
+        mock_search.return_value = [
+            {"id": "1", "type": "doctor", "content": "Dr. Smith", "metadata": {}, "score": 2.5},
+        ]
+
+        response = client.get("/components/search?query=doctor")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert len(data["results"]) == 1
+        assert data["results"][0]["type"] == "doctor"
+
+    @patch("backend.routes.scrape.db.delete_all_components")
+    def test_delete_components(self, mock_delete, client):
+        """DELETE /components should clear all components."""
+        mock_delete.return_value = 10
+
+        response = client.delete("/components")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert data["deleted"] == 10
+
+    @patch("backend.routes.scrape.db.delete_all_pages")
+    @patch("backend.routes.scrape.db.delete_all_components")
+    def test_delete_all(self, mock_components, mock_pages, client):
+        """DELETE /all should clear everything."""
+        mock_pages.return_value = 3
+        mock_components.return_value = 15
+
+        response = client.delete("/all")
+        data = response.json()
+
+        assert response.status_code == 200
+        assert data["pages_deleted"] == 3
+        assert data["components_deleted"] == 15

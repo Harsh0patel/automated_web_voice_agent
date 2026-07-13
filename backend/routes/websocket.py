@@ -12,6 +12,7 @@ from backend.LLM_CLIENT.groq_client import transcribe_audio as groq_transcribe_a
 from backend.LLM_CLIENT.elevenlabs_client import synthesize_speech
 from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
 from backend.core import database as db
+from backend.core.component_parser import format_components_for_llm
 from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -72,7 +73,7 @@ async def _process_query(
     """
     logger.info("Processing query (%d chars): %.80s", len(text), text)
 
-    # Step 1: DB lookup
+    # Step 1: Component Registry lookup
     await manager.send_json(websocket, {
         "type": "processing_started",
         "stage": "searching",
@@ -80,30 +81,27 @@ async def _process_query(
     })
 
     db_context = ""
-    results: list[dict] = []
+    components: list[dict] = []
     try:
-        results = await db.search_pages(text)
-        if results:
-            parts = []
-            for r in results[:3]:
-                parts.append(f"--- Page: {r.get('title', r['url'])} ---\n{r['content'][:2000]}")
-            db_context = "\n\n".join(parts)
-            logger.info("DB lookup found %d results for query", len(results))
+        components = await db.search_components(text)
+        if components:
+            db_context = format_components_for_llm(components, max_chars=3000)
+            logger.info("Component lookup found %d components for query", len(components))
             await manager.send_json(websocket, {
                 "type": "db_results_found",
-                "count": len(results),
-                "sources": [{"url": r["url"], "title": r["title"]} for r in results[:3]],
+                "count": len(components),
+                "component_types": list(set(c.get("type", "") for c in components)),
             })
         else:
-            logger.info("DB lookup returned 0 results for query")
+            logger.info("Component lookup returned 0 results for query")
             await manager.send_json(websocket, {
                 "type": "db_lookup_skipped",
-                "reason": "No relevant pages found in knowledge base.",
+                "reason": "No relevant data found in knowledge base.",
             })
     except Exception as exc:
         db_context = ""
-        results = []
-        logger.warning("DB lookup failed (query=%.60s): %s", text, exc)
+        components = []
+        logger.warning("Component lookup failed (query=%.60s): %s", text, exc)
         await manager.send_json(websocket, {
             "type": "db_lookup_skipped",
             "reason": str(exc),
@@ -159,7 +157,7 @@ async def _process_query(
         "type": "query_result",
         "message": response_message,
         "llm_raw": llm_result["content"],
-        "sources": [{"url": r["url"], "title": r["title"]} for r in results[:3]] if db_context else [],
+        "sources": [{"type": c["type"], "page": c.get("metadata", {}).get("page_title", ""), "url": c.get("metadata", {}).get("page_url", "")} for c in components[:5]] if db_context else [],
         "tts": {
             "size": len(tts_audio),
             "format": TTS_OUTPUT_FORMAT,

@@ -13,5 +13,5 @@ dev = [
     "groq>=1.5.0",
     "soniox>=2.8.0",
     "uvicorn>=0.51.0",
-    "elevenlabs>=2.57.0",
+    "playwright>=1.61.0",
 ]

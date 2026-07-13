@@ -3,7 +3,7 @@ End-to-end tests for the full audio → Soniox → DB Lookup → LLM → TTS pip
 All external services are mocked.
 """
 import base64
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -11,7 +11,7 @@ import pytest
 class TestFullAudioPipeline:
     """Complete end-to-end test for the audio processing pipeline."""
 
-    def test_full_audio_transcribe_pipeline(self, client, mock_soniox_client, mock_openai_client):
+    def test_full_audio_transcribe_pipeline(self, client, mock_groq_client, mock_elevenlabs_client, mock_openai_client):
         """E2E: Connect → send audio → receive query_result with TTS."""
         audio_b64 = base64.b64encode(b"fake_wav_audio_data").decode()
 
@@ -46,12 +46,16 @@ class TestFullAudioPipeline:
             r = ws.receive_json()
             assert r["type"] == "processing_started" and r["stage"] == "tts"
 
+            # TTS audio bytes (sent before query_result)
+            audio = ws.receive_bytes()
+            assert len(audio) > 0
+
             # query_result
             r = ws.receive_json()
             assert r["type"] == "query_result"
             assert "message" in r
 
-    def test_full_binary_audio_pipeline(self, client, mock_soniox_client, mock_openai_client):
+    def test_full_binary_audio_pipeline(self, client, mock_groq_client, mock_elevenlabs_client, mock_openai_client):
         """E2E: Connect → send binary audio → process_audio → receive result."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
@@ -65,13 +69,16 @@ class TestFullAudioPipeline:
             ws.receive_json()   # db_lookup_skipped
             ws.receive_json()   # processing_started (llm)
             ws.receive_json()   # processing_started (tts)
+            audio = ws.receive_bytes()  # TTS audio bytes
+            assert len(audio) > 0
             r = ws.receive_json()
             assert r["type"] == "query_result"
 
-    def test_pipeline_error_handling(self, client, mock_soniox_client, mock_openai_client):
+    def test_pipeline_error_handling(self, client, mock_groq_client, mock_openai_client):
         """E2E: Pipeline errors should be reported via WebSocket."""
-        instance = mock_soniox_client.return_value
-        instance.stt.transcribe_and_wait_with_tokens = AsyncMock(
+        # Make Groq transcription fail
+        instance = mock_groq_client.return_value
+        instance.audio.transcriptions.create = MagicMock(
             side_effect=RuntimeError("Transcription failed")
         )
         audio_b64 = base64.b64encode(b"bad_audio").decode()
@@ -85,7 +92,7 @@ class TestFullAudioPipeline:
             r = ws.receive_json()  # error
             assert r["type"] == "error"
 
-    def test_mixed_json_and_audio_flow(self, client, mock_soniox_client, mock_openai_client):
+    def test_mixed_json_and_audio_flow(self, client, mock_groq_client, mock_elevenlabs_client, mock_openai_client):
         """E2E: Mixed flow — text, then audio, then chat."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
@@ -96,6 +103,8 @@ class TestFullAudioPipeline:
             ws.receive_json()  # db_lookup_skipped
             ws.receive_json()  # processing (llm)
             ws.receive_json()  # processing (tts)
+            audio = ws.receive_bytes()  # TTS audio
+            assert len(audio) > 0
             r = ws.receive_json()
             assert r["type"] == "query_result"
 
@@ -109,6 +118,8 @@ class TestFullAudioPipeline:
             ws.receive_json()  # db_skip
             ws.receive_json()  # llm
             ws.receive_json()  # tts
+            audio = ws.receive_bytes()  # TTS audio
+            assert len(audio) > 0
             r = ws.receive_json()
             assert r["type"] == "query_result"
 
@@ -118,6 +129,8 @@ class TestFullAudioPipeline:
             ws.receive_json()  # db_skip
             ws.receive_json()  # llm
             ws.receive_json()  # tts
+            audio = ws.receive_bytes()  # TTS audio
+            assert len(audio) > 0
             r = ws.receive_json()
             assert r["type"] == "query_result"
 
@@ -125,7 +138,7 @@ class TestFullAudioPipeline:
 class TestLLMIntegration:
     """End-to-end tests for the LLM integration."""
 
-    def test_llm_response_format(self, client, mock_openai_client):
+    def test_llm_response_format(self, client, mock_elevenlabs_client, mock_openai_client):
         """The LLM response should be a query_result with message."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
@@ -135,6 +148,8 @@ class TestLLMIntegration:
             ws.receive_json()  # db_skip
             ws.receive_json()  # llm
             ws.receive_json()  # tts
+            audio = ws.receive_bytes()  # TTS audio bytes
+            assert len(audio) > 0
             r = ws.receive_json()
             assert r["type"] == "query_result"
             assert isinstance(r.get("message", ""), str)
@@ -155,6 +170,7 @@ class TestLLMIntegration:
             r = ws.receive_json()  # llm processing_started
             assert r["type"] == "processing_started"
 
-            r = ws.receive_json()  # error
+            # LLM fails → outer handler sends error; no TTS stage reached
+            r = ws.receive_json()
             assert r["type"] == "error"
-            assert "OpenAI" in r["message"]
+            assert "OpenAI" in str(r.get("message", "")) or "OpenAI" in str(r.get("details", ""))

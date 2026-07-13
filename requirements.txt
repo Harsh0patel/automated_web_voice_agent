@@ -7,3 +7,8 @@ groq
 elevenlabs
 soniox
 uvicorn
+playwright
+pytest
+pytest-asyncio
+pytest-mock
+python-dotenv

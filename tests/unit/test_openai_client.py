@@ -75,7 +75,7 @@ class TestGenerateJsonFromTranscript:
         assert "content" in result
         assert "parsed" in result
         assert "model" in result
-        assert result["parsed"] == {"result": "success", "data": "processed"}
+        assert result["parsed"] == {"message": "This is a test response from the LLM."}
         assert isinstance(result["model"], str)
         assert len(result["model"]) > 0
 

@@ -41,7 +41,7 @@ class TestWebSocketConnection:
 class TestWebSocketPlainText:
     """Plain text input goes through the full LLM pipeline."""
 
-    def test_plain_text_triggers_query(self, client, mock_openai_client):
+    def test_plain_text_triggers_query(self, client, mock_elevenlabs_client, mock_openai_client, disable_mongo):
         """Sending plain text should return a query_result."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
@@ -51,6 +51,8 @@ class TestWebSocketPlainText:
             ws.receive_json()  # db_lookup_skipped
             ws.receive_json()  # processing (llm)
             ws.receive_json()  # processing (tts)
+            audio = ws.receive_bytes()  # TTS audio bytes
+            assert len(audio) > 0
             r = ws.receive_json()  # query_result
             assert r["type"] == "query_result"
 
@@ -108,7 +110,7 @@ class TestWebSocketBinaryAudio:
             response = ws.receive_json()
             assert response["type"] == "error"
 
-    def test_process_audio_pipeline_with_keys(self, client, mock_soniox_client, mock_openai_client):
+    def test_process_audio_pipeline_with_keys(self, client, mock_groq_client, mock_elevenlabs_client, mock_openai_client, disable_mongo):
         """Full audio pipeline with mocked services returns query_result."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()
@@ -123,6 +125,8 @@ class TestWebSocketBinaryAudio:
             ws.receive_json()  # db_skip
             ws.receive_json()  # llm
             ws.receive_json()  # tts
+            audio = ws.receive_bytes()  # TTS audio bytes
+            assert len(audio) > 0
             r = ws.receive_json()  # result
             assert r["type"] == "query_result"
 
@@ -146,7 +150,7 @@ class TestWebSocketAudioTranscribe:
             r = ws.receive_json()
             assert r["type"] == "error"
 
-    def test_audio_transcribe_with_valid_data(self, client, mock_soniox_client, mock_openai_client):
+    def test_audio_transcribe_with_valid_data(self, client, mock_groq_client, mock_elevenlabs_client, mock_openai_client, disable_mongo):
         """audio_transcribe with valid base64 data should process audio."""
         audio_b64 = base64.b64encode(b"fake_audio").decode()
         with client.websocket_connect("/ws") as ws:
@@ -159,6 +163,8 @@ class TestWebSocketAudioTranscribe:
             ws.receive_json()  # db_skip
             ws.receive_json()  # llm
             ws.receive_json()  # tts
+            audio = ws.receive_bytes()  # TTS audio bytes
+            assert len(audio) > 0
             r = ws.receive_json()  # query_result
             assert r["type"] == "query_result"
 
@@ -184,7 +190,7 @@ class TestWebSocketChat:
         finally:
             cfg.OPENAI_API_KEY = original
 
-    def test_chat_with_mocked_llm(self, client, mock_openai_client):
+    def test_chat_with_mocked_llm(self, client, mock_elevenlabs_client, mock_openai_client, disable_mongo):
         """Chat with mocked OpenAI should return query_result."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # welcome
@@ -194,11 +200,13 @@ class TestWebSocketChat:
             ws.receive_json()  # db_skip
             ws.receive_json()  # llm
             ws.receive_json()  # tts
+            audio = ws.receive_bytes()  # TTS audio bytes
+            assert len(audio) > 0
             r = ws.receive_json()  # query_result
             assert r["type"] == "query_result"
             assert "message" in r
 
-    def test_chat_preserves_content(self, client, mock_openai_client):
+    def test_chat_preserves_content(self, client, mock_elevenlabs_client, mock_openai_client, disable_mongo):
         """Chat should pass content through the pipeline."""
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()
@@ -208,5 +216,7 @@ class TestWebSocketChat:
             ws.receive_json()  # db_skip
             ws.receive_json()  # llm
             ws.receive_json()  # tts
+            audio = ws.receive_bytes()  # TTS audio bytes
+            assert len(audio) > 0
             r = ws.receive_json()
             assert r["type"] == "query_result"

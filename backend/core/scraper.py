@@ -93,6 +93,7 @@ async def scrape_url(url: str) -> dict:
         "url": url,
         "title": title,
         "content": content or soup.get_text(separator="\n", strip=True),
+        "raw_html": html,
         "metadata": {
             "status_code": response.status_code,
             "content_length": len(html),
