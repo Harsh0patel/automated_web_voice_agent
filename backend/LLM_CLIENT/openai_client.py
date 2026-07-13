@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -21,6 +22,49 @@ async def load_system_prompt() -> str:
         return text
     logger.debug("Prompt file %s not found, using empty prompt", prompt_path)
     return ""
+
+
+def _try_extract_json(text: str) -> dict | None:
+    """Try multiple strategies to extract valid JSON from LLM output."""
+    # Strategy 1: Try parsing the full text as JSON
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: Strip XML/HTML-style tags (like <thought>...</thought>) and try again
+    cleaned = re.sub(r"<[^>]+>", "", text).strip()
+    if cleaned != text:
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 3: Find the first { } JSON object in the text
+    brace_match = re.search(r"\{[^{}]*" + '"message"' + r"[^{}]*\}", cleaned, re.DOTALL)
+    if brace_match:
+        try:
+            return json.loads(brace_match.group())
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 4: Find ANY { } block
+    depth = 0
+    start = -1
+    for i, ch in enumerate(cleaned):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start >= 0:
+                try:
+                    return json.loads(cleaned[start:i+1])
+                except json.JSONDecodeError:
+                    start = -1
+
+    return None
 
 
 async def generate_json_from_transcript(
@@ -79,13 +123,16 @@ async def generate_json_from_transcript(
     content_raw = response.choices[0].message.content or "{}"
     logger.info("OpenAI response received (%d chars, model=%s)", len(content_raw), model_name)
 
-    # Parse the JSON string into an actual dict for proper WebSocket delivery
-    try:
-        parsed_content = json.loads(content_raw)
+    # Try multiple strategies to extract valid JSON
+    parsed_content = _try_extract_json(content_raw)
+
+    if parsed_content is not None:
         logger.debug("Successfully parsed LLM JSON response")
-    except json.JSONDecodeError:
-        parsed_content = {"raw_text": content_raw}
-        logger.warning("LLM response was not valid JSON, wrapping in raw_text")
+    else:
+        # Last resort: use the raw text as a message (strip XML tags for cleanliness)
+        cleaned_text = re.sub(r"<[^>]+>", "", content_raw).strip()
+        parsed_content = {"message": cleaned_text or content_raw}
+        logger.warning("LLM response was not valid JSON, using raw text as message")
 
     return {
         "content": content_raw,

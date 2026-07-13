@@ -3,5 +3,7 @@ fastapi
 httpx
 motor
 openai
+groq
+elevenlabs
 soniox
 uvicorn

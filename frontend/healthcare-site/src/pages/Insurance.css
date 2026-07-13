@@ -1,0 +1,263 @@
+/* =============================================
+   Insurance Plans
+   ============================================= */
+.insurance-plans {
+  background: var(--bg-gray);
+}
+
+.plans__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.plan-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 40px 32px;
+  border: 1.5px solid var(--border);
+  transition: var(--transition);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+}
+
+.plan-card--popular {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary), var(--shadow-md);
+  transform: scale(1.04);
+  z-index: 1;
+}
+
+.plan-card--popular:hover {
+  transform: scale(1.04) translateY(-6px);
+  box-shadow: 0 0 0 1px var(--primary), var(--shadow-lg);
+}
+
+.plan-card__badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 5px 18px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.plan-card__name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.plan-card__price {
+  margin-bottom: 8px;
+}
+
+.plan-card__amount {
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+}
+
+.plan-card__period {
+  font-size: 1rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.plan-card__desc {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-card__features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex: 1;
+}
+
+.plan-card__features li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+.plan-card__btn {
+  justify-content: center;
+  width: 100%;
+}
+
+/* =============================================
+   Coverage Grid
+   ============================================= */
+.coverage {
+  background: var(--bg-white);
+}
+
+.coverage__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.coverage__card {
+  background: var(--bg-gray);
+  border-radius: var(--radius-md);
+  padding: 28px 24px;
+  text-align: center;
+  transition: var(--transition);
+}
+
+.coverage__card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.coverage__icon {
+  font-size: 2.25rem;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.coverage__card h4 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.coverage__card p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* =============================================
+   FAQ Accordion
+   ============================================= */
+.faq-section {
+  background: var(--bg-gray);
+}
+
+.faq__list {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.faq__item {
+  background: white;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.faq__item:hover {
+  border-color: var(--primary-light);
+}
+
+.faq__item--open {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.faq__question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+  font-family: var(--font);
+  transition: var(--transition);
+}
+
+.faq__question:hover {
+  color: var(--primary);
+}
+
+.faq__chevron {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.faq__chevron--open {
+  transform: rotate(180deg);
+}
+
+.faq__answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, padding 0.35s ease;
+}
+
+.faq__item--open .faq__answer {
+  max-height: 300px;
+}
+
+.faq__answer p {
+  padding: 0 24px 20px;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* =============================================
+   Responsive
+   ============================================= */
+@media (max-width: 968px) {
+  .plans__grid {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .plan-card--popular {
+    transform: none;
+  }
+
+  .plan-card--popular:hover {
+    transform: translateY(-6px);
+  }
+
+  .coverage__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .coverage__grid {
+    grid-template-columns: 1fr;
+  }
+}

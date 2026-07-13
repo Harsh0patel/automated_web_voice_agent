@@ -148,7 +148,7 @@ class TestGenerateJsonFromTranscript:
         from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
 
         result = await generate_json_from_transcript("Hello")
-        assert result["parsed"] == {"raw_text": "Not valid JSON"}
+        assert result["parsed"] == {"message": "Not valid JSON"}
 
     @pytest.mark.asyncio
     async def test_passes_transcript_in_user_message(self, mock_openai_client):

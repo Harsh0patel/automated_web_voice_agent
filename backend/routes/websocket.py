@@ -8,7 +8,8 @@ import traceback
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from backend.LLM_CLIENT.soniox_client import transcribe_audio, synthesize_speech
+from backend.LLM_CLIENT.groq_client import transcribe_audio as groq_transcribe_audio
+from backend.LLM_CLIENT.elevenlabs_client import synthesize_speech
 from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
 from backend.core import database as db
 from backend.core.logger import get_logger
@@ -53,6 +54,9 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+
+TTS_OUTPUT_FORMAT = "mp3"  # ElevenLabs default; used for Web playback
 
 
 async def _process_query(
@@ -138,7 +142,7 @@ async def _process_query(
     tts_error = None
     if response_message.strip():
         try:
-            tts_audio = await synthesize_speech(response_message)
+            tts_audio = await synthesize_speech(response_message, audio_format=TTS_OUTPUT_FORMAT)
             logger.info("TTS generated: %d bytes", len(tts_audio))
         except Exception as e:
             tts_error = str(e)
@@ -158,7 +162,7 @@ async def _process_query(
         "sources": [{"url": r["url"], "title": r["title"]} for r in results[:3]] if db_context else [],
         "tts": {
             "size": len(tts_audio),
-            "format": "wav",
+            "format": TTS_OUTPUT_FORMAT,
         } if tts_audio else None,
         "tts_error": tts_error,
     })
@@ -178,7 +182,7 @@ async def _run_audio_pipeline(
         "stage": "transcribing",
         "message": f"Transcribing {len(audio_bytes)} bytes of audio...",
     })
-    transcript = await transcribe_audio(audio_bytes, audio_format=audio_format)
+    transcript = await groq_transcribe_audio(audio_bytes, audio_format=audio_format)
     logger.info("Transcription complete: %.100s", transcript)
     await manager.send_json(websocket, {
         "type": "transcription_complete",

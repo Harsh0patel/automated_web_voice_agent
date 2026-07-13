@@ -1,0 +1,227 @@
+/* =============================================
+   Contact Section
+   ============================================= */
+.contact-page {
+  background: var(--bg-white);
+}
+
+.contact__grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 48px;
+  align-items: start;
+}
+
+/* =============================================
+   Contact Info Cards
+   ============================================= */
+.contact__info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contact-info-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  background: var(--bg-gray);
+  padding: 24px;
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.contact-info-card:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow-sm);
+}
+
+.contact-info-card__icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.contact-info-card h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.contact-info-card p,
+.contact-info-card a {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.contact-info-card a {
+  display: block;
+  transition: var(--transition);
+}
+
+.contact-info-card a:hover {
+  color: var(--primary);
+}
+
+/* =============================================
+   Contact Form
+   ============================================= */
+.contact__form-wrapper {
+  background: var(--bg-gray);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+}
+
+.contact__form-wrapper h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+}
+
+.form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form__group {
+  margin-bottom: 16px;
+}
+
+.form__group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form__group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.form__group label span {
+  color: #dc2626;
+}
+
+.form__group input,
+.form__group select,
+.form__group textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-family: var(--font);
+  color: var(--text-primary);
+  background: white;
+  transition: var(--transition);
+  outline: none;
+}
+
+.form__group input:focus,
+.form__group select:focus,
+.form__group textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+.form__group textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.form__group input::placeholder,
+.form__group textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.form__submit {
+  width: 100%;
+  justify-content: center;
+  padding: 16px 32px;
+  font-size: 1rem;
+  margin-top: 8px;
+}
+
+/* Success message */
+.contact__success {
+  text-align: center;
+  padding: 60px 40px;
+  background: var(--bg-gray);
+  border-radius: var(--radius-lg);
+}
+
+.contact__success-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.contact__success h3 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.contact__success p {
+  font-size: 1.0625rem;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+/* =============================================
+   Map placeholder
+   ============================================= */
+.contact__map {
+  margin-top: 48px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-gray);
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 3rem;
+  border: 1px solid var(--border);
+}
+
+.contact__map p {
+  font-size: 1rem;
+  margin-top: 8px;
+}
+
+/* =============================================
+   Responsive
+   ============================================= */
+@media (max-width: 868px) {
+  .contact__grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .contact__form-wrapper {
+    padding: 28px;
+  }
+
+  .form__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact__form-wrapper {
+    padding: 20px;
+  }
+}

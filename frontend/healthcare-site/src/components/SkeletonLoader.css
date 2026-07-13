@@ -1,0 +1,199 @@
+/* =============================================
+   Skeleton Loader
+   Animated placeholder blocks that mimic the
+   site's page layout during chunk loading.
+   ============================================= */
+
+/* ── Shimmer animation ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton__block {
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    var(--bg-white) 50%,
+    var(--border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm, 8px);
+}
+
+/* ── Header ── */
+.skeleton__header {
+  background: linear-gradient(135deg, #f0fdfa, #f8fafc);
+  padding: 80px 0 64px;
+}
+
+.skeleton__header-inner {
+  max-width: var(--max-width, 1200px);
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.skeleton__tag {
+  width: 140px;
+  height: 28px;
+  border-radius: 100px;
+}
+
+.skeleton__title {
+  width: 480px;
+  max-width: 80%;
+  height: 44px;
+  border-radius: var(--radius-sm, 8px);
+}
+
+.skeleton__subtitle {
+  width: 400px;
+  max-width: 70%;
+  height: 18px;
+  border-radius: var(--radius-sm, 8px);
+}
+
+/* ── Body section ── */
+.skeleton__body {
+  padding: 96px 0;
+}
+
+.skeleton__section-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+
+.skeleton__tag--sm { width: 100px; height: 24px; }
+.skeleton__title--sm { height: 36px; }
+.skeleton__text { height: 14px; border-radius: 4px; }
+.skeleton__text--narrow { width: 360px; max-width: 65%; }
+
+/* ── Card grid ── */
+.skeleton__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.skeleton__card {
+  background: var(--bg-white);
+  border-radius: var(--radius-md, 12px);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06));
+}
+
+.skeleton__icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.skeleton__card-title {
+  width: 140px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.skeleton__card-text {
+  width: 100%;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.skeleton__card-text--short {
+  width: 60%;
+}
+
+/* ── CTA banner ── */
+.skeleton__cta {
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  padding: 64px 0;
+}
+
+.skeleton__cta-inner {
+  max-width: var(--max-width, 1200px);
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.skeleton__cta-inner .skeleton__block {
+  /* Override shimmer colors for teal background */
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.15) 25%,
+    rgba(255,255,255,0.35) 50%,
+    rgba(255,255,255,0.15) 75%
+  );
+  background-size: 200% 100%;
+}
+
+.skeleton__cta-inner .skeleton__title {
+  width: 320px;
+}
+
+.skeleton__btn {
+  width: 180px;
+  height: 48px;
+  border-radius: var(--radius-sm, 8px);
+}
+
+/* =============================================
+   Responsive
+   ============================================= */
+@media (max-width: 768px) {
+  .skeleton__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .skeleton__header { padding: 60px 0 48px; }
+  .skeleton__body { padding: 64px 0; }
+}
+
+@media (max-width: 480px) {
+  .skeleton__grid {
+    grid-template-columns: 1fr;
+  }
+  .skeleton__title { height: 32px; }
+  .skeleton__subtitle { height: 14px; }
+}
+
+/* =============================================
+   Dark mode overrides
+   ============================================= */
+[data-theme="dark"] .skeleton__header {
+  background: linear-gradient(135deg, #0a1f1c, var(--bg-gray));
+}
+
+[data-theme="dark"] .skeleton__card {
+  background: var(--bg-white);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .skeleton__block {
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    var(--bg-gray) 50%,
+    var(--border) 75%
+  );
+  background-size: 200% 100%;
+}
+
+[data-theme="dark"] .skeleton__cta {
+  background: linear-gradient(135deg, #0a1f1c, #0f2d2a);
+}
