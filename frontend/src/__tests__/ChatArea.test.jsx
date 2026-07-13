@@ -40,7 +40,7 @@ describe('ChatArea', () => {
         role: 'assistant',
         text: 'Found results',
         time: '12:03',
-        sources: [{ title: 'Medical Page', url: 'https://example.com' }],
+        sources: [{ page: 'Medical Page', url: 'https://example.com' }],
       },
     ];
     render(<ChatArea messages={messages} messagesEndRef={null} />);

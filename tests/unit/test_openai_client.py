@@ -167,7 +167,7 @@ class TestGenerateJsonFromTranscript:
 
     @pytest.mark.asyncio
     async def test_response_format_json(self, mock_openai_client):
-        """Should request json_object response format."""
+        """Should NOT pass response_format when OPENAI_JSON_MODE is false."""
         from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
 
         await generate_json_from_transcript("Hello")
@@ -175,4 +175,6 @@ class TestGenerateJsonFromTranscript:
         instance = mock_openai_client.return_value
         call = instance.chat.completions.create.await_args
         assert call is not None
-        assert call.kwargs["response_format"] == {"type": "json_object"}
+        # json_object mode is disabled by default (OPENAI_JSON_MODE=false)
+        # so response_format should NOT be in kwargs
+        assert "response_format" not in call.kwargs

@@ -4,6 +4,7 @@ WebSocket route for voice/text queries with:
 """
 import base64
 import json
+import re
 import traceback
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -126,7 +127,33 @@ async def _process_query(
 
     llm_result = await generate_json_from_transcript(augmented_text)
     llm_parsed = llm_result.get("parsed", {})
-    response_message = llm_parsed.get("message", llm_result.get("content", ""))
+    response_message = llm_parsed.get("message", "")
+    response_action = llm_parsed.get("action")
+
+    if not response_message:
+        # Parsed message was empty — try extracting from the raw content
+        # (handles models where <thought> tags or malformed JSON wrapping
+        # cause the parser to return an empty message)
+        raw = llm_result.get("content", "")
+        if raw and raw != "{}":
+            # Strip XML tags first so we can try parsing the JSON portion
+            clean_raw = re.sub(r"<[^>]+>", "", raw).strip()
+            # Try parsing as JSON (handles cases where raw is just {"message": "..."})
+            try:
+                p = json.loads(clean_raw)
+                if isinstance(p, dict):
+                    response_message = p.get("message", clean_raw) or clean_raw
+            except (json.JSONDecodeError, TypeError):
+                pass
+            # If still empty, search for the FIRST non-empty {"message":"..."} pattern
+            if not response_message:
+                m = re.search(r'\{\s*"message"\s*:\s*"([^"]+)"\s*\}', clean_raw)
+                if m:
+                    response_message = m.group(1)
+            # Last resort: use the cleaned raw content (without tags)
+            if not response_message:
+                response_message = clean_raw
+
     logger.info("LLM response generated (%d chars)", len(response_message))
 
     # Step 3: Always do TTS
@@ -156,6 +183,7 @@ async def _process_query(
     await manager.send_json(websocket, {
         "type": "query_result",
         "message": response_message,
+        "action": response_action,
         "llm_raw": llm_result["content"],
         "sources": [{"type": c["type"], "page": c.get("metadata", {}).get("page_title", ""), "url": c.get("metadata", {}).get("page_url", "")} for c in components[:5]] if db_context else [],
         "tts": {

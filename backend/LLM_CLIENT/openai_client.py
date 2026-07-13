@@ -48,9 +48,12 @@ def _try_extract_json(text: str) -> dict | None:
         except json.JSONDecodeError:
             pass
 
-    # Strategy 4: Find ANY { } block
+    # Strategy 4: Find ALL complete { } blocks and use the LAST one with a "message" key.
+    # This handles LLM output where earlier blocks are reasoning previews
+    # and the final JSON at the end is the actual response.
     depth = 0
     start = -1
+    last_valid = None
     for i, ch in enumerate(cleaned):
         if ch == "{":
             if depth == 0:
@@ -60,9 +63,14 @@ def _try_extract_json(text: str) -> dict | None:
             depth -= 1
             if depth == 0 and start >= 0:
                 try:
-                    return json.loads(cleaned[start:i+1])
+                    candidate = json.loads(cleaned[start:i+1])
+                    if isinstance(candidate, dict) and "message" in candidate:
+                        last_valid = candidate
                 except json.JSONDecodeError:
-                    start = -1
+                    pass
+                start = -1
+    if last_valid:
+        return last_valid
 
     return None
 

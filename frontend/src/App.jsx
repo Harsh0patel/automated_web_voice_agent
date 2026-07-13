@@ -172,18 +172,35 @@ export default function App() {
     reader.readAsDataURL(blob);
   }
 
-  // --- Scrape URL ---
+  // --- Scrape URL (full site) ---
   const scrapeUrl = useCallback(async (url) => {
     if (!url.trim()) return;
-    setScrapeStatus('⏳ Scraping...');
+    setScrapeStatus('⏳ Crawling site with Playwright...');
     try {
-      const res = await fetch(`${API_BASE}/scrape?url=${encodeURIComponent(url)}`, { method: 'POST' });
+      const res = await fetch(
+        `${API_BASE}/scrape-site?url=${encodeURIComponent(url)}&max_pages=25`,
+        { method: 'POST' },
+      );
       const data = await res.json();
       if (data.error) {
         setScrapeStatus(`❌ ${data.error}`);
       } else {
-        setScrapeStatus(`✅ Scraped: ${data.title || data.url}`);
-        addMessage('system', `📄 Added "${data.title || data.url}" to knowledge base`);
+        const stored = data.stored ?? 0;
+        const components = data.total_components_stored ?? 0;
+        const failed = data.failed ?? 0;
+        const pageWord = stored === 1 ? 'page' : 'pages';
+        setScrapeStatus(
+          `✅ ${stored} ${pageWord}, ${components} components`,
+        );
+        if (failed > 0) {
+          addMessage('system', `⚠️ ${failed} page(s) failed to scrape`);
+        }
+        if (stored > 0) {
+          addMessage(
+            'system',
+            `📄 Scraped ${stored} ${pageWord} (${components} components) from ${url}`,
+          );
+        }
         loadPages();
       }
     } catch (err) {

@@ -29,7 +29,7 @@ function MessageBubble({ msg }) {
         <div className="msg-sources">
           {msg.sources.map((s, i) => (
             <span className="source-tag" key={i} title={s.url}>
-              {s.title || s.url.replace(/^https?:\/\//, '')}
+              {s.page || s.url.replace(/^https?:\/\//, '')}
             </span>
           ))}
         </div>

@@ -117,3 +117,291 @@ img { max-width: 100%; display: block; }
   .container { padding: 0 16px; }
   .btn { padding: 12px 24px; font-size: 0.9375rem; }
 }
+
+/* =============================================
+   Healthcare Chat Widget (HCW)
+   ============================================= */
+
+/* ── Floating action button ── */
+.hcw-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #fff;
+  font-size: 1.4rem;
+  cursor: pointer;
+  z-index: 999;
+  box-shadow: 0 4px 20px rgba(13,148,136,0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hcw-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 28px rgba(13,148,136,0.5);
+}
+.hcw-fab:active { transform: scale(0.95); }
+
+/* ── Chat panel ── */
+.hcw-panel {
+  position: fixed;
+  bottom: 90px;
+  right: 24px;
+  width: 380px;
+  max-height: 600px;
+  height: 70vh;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+  z-index: 998;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.hcw-panel.hcw-open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: all;
+}
+
+[data-theme="dark"] .hcw-panel { background: var(--bg-white); }
+
+/* ── Header ── */
+.hcw-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  flex-shrink: 0;
+}
+.hcw-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  flex: 1;
+}
+.hcw-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f87171;
+  transition: background 0.3s;
+}
+.hcw-dot.connected { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+.hcw-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  opacity: 0.8;
+  transition: opacity 0.2s, background 0.2s;
+}
+.hcw-close:hover { opacity: 1; background: rgba(255,255,255,0.15); }
+
+/* ── Messages area ── */
+.hcw-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-gray);
+}
+
+.hcw-welcome {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+/* ── Message bubbles ── */
+.hcw-msg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  animation: fadeInUp 0.25s ease;
+  word-wrap: break-word;
+}
+.hcw-user {
+  align-self: flex-end;
+  background: var(--primary);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.hcw-assistant {
+  align-self: flex-start;
+  background: #fff;
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+[data-theme="dark"] .hcw-assistant { background: var(--bg-gray); }
+
+.hcw-system {
+  align-self: center;
+  background: #fff8e1;
+  color: #856404;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 8px;
+  max-width: 90%;
+}
+[data-theme="dark"] .hcw-system { background: #3b2f1e; color: #fbbf24; }
+
+.hcw-msg-time {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  margin-top: 4px;
+}
+
+/* ── Typing indicator ── */
+.hcw-typing {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+[data-theme="dark"] .hcw-typing { background: var(--bg-gray); }
+.hcw-typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typing 1.4s ease-in-out infinite;
+}
+.hcw-typing span:nth-child(2) { animation-delay: 0.2s; }
+.hcw-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+  0%,60%,100% { transform: translateY(0); opacity: 0.3; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ── Audio player bar ── */
+.hcw-audio-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-gray);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.hcw-play-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.15s;
+}
+.hcw-play-btn:hover { background: var(--primary-dark); transform: scale(1.05); }
+.hcw-audio-wave {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+}
+.hcw-audio-wave span {
+  flex: 1;
+  background: var(--primary);
+  border-radius: 2px;
+  opacity: 0.3;
+  transition: opacity 0.15s;
+}
+
+/* ── Input bar ── */
+.hcw-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: #fff;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .hcw-input { background: var(--bg-white); }
+.hcw-input input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  background: var(--bg-gray);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+  font-family: var(--font);
+}
+.hcw-input input:focus { outline: none; border-color: var(--primary); }
+.hcw-input input::placeholder { color: var(--text-muted); }
+
+.hcw-mic, .hcw-send {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.hcw-mic { background: var(--border); color: var(--text-secondary); }
+.hcw-mic:hover { background: #cbd5e0; transform: scale(1.05); }
+.hcw-mic.recording {
+  background: #ef4444;
+  color: #fff;
+  animation: micPulse 1s infinite;
+}
+@keyframes micPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+}
+.hcw-send { background: var(--primary); color: #fff; }
+.hcw-send:hover { background: var(--primary-dark); transform: scale(1.05); }
+.hcw-send:active { transform: scale(0.95); }
+
+@media (max-width: 480px) {
+  .hcw-panel {
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .hcw-fab { bottom: 16px; right: 16px; }
+}

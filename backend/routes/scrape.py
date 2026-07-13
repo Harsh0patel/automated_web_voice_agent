@@ -5,6 +5,8 @@ from fastapi import APIRouter
 
 from backend.core import database as db
 from backend.core.component_parser import parse_page
+import traceback
+
 from backend.core.logger import get_logger
 from backend.core.scraper import scrape_url
 from backend.core.scraper_site import scrape_site
@@ -80,7 +82,10 @@ async def list_pages():
 
 
 @router.post("/scrape-site")
-async def scrape_site_endpoint(url: str, max_concurrency: int = 3):
+async def scrape_site_endpoint(
+    url: str,
+    max_pages: int = 25,
+):
     """
     Scrape an entire website in one shot.
 
@@ -89,17 +94,30 @@ async def scrape_site_endpoint(url: str, max_concurrency: int = 3):
 
     Args:
         url: Base URL of the site to scrape (e.g. http://localhost:5174).
-        max_concurrency: Max parallel page renders (default 3).
+        max_pages: Max pages to scrape (default 25). Prevents runaway scraping
+                   on large production sites.
 
     Returns:
         Dict with scraped pages, total count, and any errors.
     """
-    logger.info("Site scrape requested: %s (concurrency=%d)", url, max_concurrency)
+    logger.info(
+        "Site scrape requested: %s (max_pages=%d)",
+        url, max_pages,
+    )
 
     if not url or not url.startswith(("http://", "https://")):
         return {"error": "Invalid URL. Must start with http:// or https://"}
 
-    result = await scrape_site(url, max_concurrency=max_concurrency)
+    try:
+        result = await scrape_site(url, max_pages=max_pages)
+    except Exception:
+        tb = traceback.format_exc()
+        logger.error("scrape_site(%s) failed:\n%s", url, tb)
+        return {
+            "error": "Internal error during site scrape",
+            "detail": tb,
+            "hint": "Ensure Playwright browsers are installed: uv run python -m playwright install chromium",
+        }
 
     if result.get("errors"):
         logger.warning("Site scrape had %d errors", len(result["errors"]))

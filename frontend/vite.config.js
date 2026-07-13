@@ -11,6 +11,7 @@ export default defineConfig({
         target: 'ws://localhost:8000',
         ws: true,
       },
+      '/scrape-site': 'http://localhost:8000',
       '/scrape': 'http://localhost:8000',
       '/pages': 'http://localhost:8000',
       '/health': 'http://localhost:8000',

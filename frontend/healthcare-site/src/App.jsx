@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import SkeletonLoader from './components/SkeletonLoader.jsx';
+import ChatWidget from './components/ChatWidget.jsx';
 import { preloadPages, preloadPage } from './utils/preload.js';
 
 // Lazy-loaded page components — each becomes a separate JS chunk
@@ -88,6 +89,7 @@ export default function App() {
         </Suspense>
       </main>
       <Footer />
+      <ChatWidget />
     </div>
   );
 }

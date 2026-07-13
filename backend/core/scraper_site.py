@@ -7,59 +7,148 @@ Handles the full pipeline:
   3. Render each discovered page fully (waits for JS to execute)
   4. Extract clean text content from the rendered HTML
   5. Return all results for batch storage
+
+Uses Playwright's **sync** API running in a **single dedicated thread**
+(ThreadPoolExecutor with max_workers=1). This hybrid approach avoids:
+
+  - Windows NotImplementedError from async_playwright().start() (event loop
+    subprocess incompatibility)
+  - greenlet.error: Cannot switch to a different thread (caused by calling
+    sync_playwright from multiple threads concurrently)
+
+Because the executor has only 1 worker, all Playwright operations are
+serialised on that thread, keeping greenlets happy. The asyncio layer
+provides the outer orchestration + concurrency via Semaphore (though
+actual page rendering is sequential due to the single-thread executor).
 """
 from urllib.parse import urljoin, urlparse
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
 
 from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+# ── Globals ──
 _PLAYWRIGHT = None
 _BROWSER = None
+_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pw")
 
 
-async def _start() -> None:
-    """Start Playwright and launch the shared browser."""
+# ══════════════════════════════════════════════════════════
+#  Low-level sync functions (run inside the executor thread)
+# ══════════════════════════════════════════════════════════
+
+def _start_sync() -> None:
+    """Start Playwright and launch the shared browser (runs in executor thread)."""
     global _PLAYWRIGHT, _BROWSER
-    if _BROWSER is None:
-        _PLAYWRIGHT = await async_playwright().start()
-        _BROWSER = await _PLAYWRIGHT.chromium.launch(headless=True)
-        logger.info("Playwright browser launched")
+    if _BROWSER is not None:
+        return
+    _PLAYWRIGHT = sync_playwright().start()
+    _BROWSER = _PLAYWRIGHT.chromium.launch(headless=True)
+    logger.info("Playwright browser launched (sync thread)")
 
 
-async def _stop() -> None:
-    """Close the shared browser and stop Playwright."""
+def _stop_sync() -> None:
+    """Close the shared browser and stop Playwright (runs in executor thread)."""
     global _PLAYWRIGHT, _BROWSER
     if _BROWSER:
-        await _BROWSER.close()
+        _BROWSER.close()
         _BROWSER = None
     if _PLAYWRIGHT:
-        await _PLAYWRIGHT.stop()
+        _PLAYWRIGHT.stop()
         _PLAYWRIGHT = None
-    logger.info("Playwright browser closed")
+    logger.info("Playwright browser closed (sync thread)")
+
+
+def _render_page_sync(url: str, timeout: int = 30) -> dict:
+    """Render a single page with Playwright (runs in executor thread)."""
+    try:
+        _start_sync()
+        browser = _BROWSER
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+        )
+        page = context.new_page()
+    except Exception as exc:
+        logger.error("Failed to initialise browser for %s: %s", url, exc)
+        return {"url": url, "title": url, "content": f"[Render failed: {exc}]"}
+
+    try:
+        logger.info("Rendering %s with Playwright ...", url)
+        # domcontentloaded avoids indefinite hangs on Cloudflare / long-polling
+        page.goto(url, wait_until="domcontentloaded", timeout=timeout * 1000)
+        page.wait_for_timeout(2000)  # let JS frameworks (React) mount
+
+        html = page.content()
+        result = _extract_from_html(html, url)
+        logger.info(
+            "Rendered %s — title=%.60s, content=%d chars",
+            url, result["title"], len(result["content"]),
+        )
+        return result
+    except Exception as exc:
+        logger.error("Failed to render %s: %s", url, exc)
+        return {"url": url, "title": url, "content": f"[Render failed: {exc}]"}
+    finally:
+        page.close()
+        context.close()
+
+
+def _discover_links_sync(base_url: str) -> list[str]:
+    """Render the base page and extract all internal links (runs in executor thread)."""
+    _start_sync()
+    context = _BROWSER.new_context()
+    page = context.new_page()
+
+    try:
+        page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
+
+        parsed_base = urlparse(base_url)
+        base_domain = parsed_base.netloc
+
+        hrefs = page.evaluate("""() => {
+            return Array.from(document.querySelectorAll('a[href]'))
+                .map(a => a.href)
+                .filter(h => h && !h.startsWith('javascript:') && !h.startsWith('mailto:'));
+        }""")
+
+        discovered: set[str] = set()
+        for href in hrefs:
+            parsed = urlparse(href)
+            if parsed.netloc and parsed.netloc != base_domain:
+                continue
+            if parsed.scheme and parsed.scheme not in ("http", "https"):
+                continue
+            full = urljoin(base_url, href)
+            full = full.split("#")[0]
+            if full.startswith(("http://", "https://")):
+                discovered.add(full)
+
+        result = sorted(discovered)
+        logger.info("Discovered %d internal links from %s", len(result), base_url)
+        return result
+    finally:
+        page.close()
+        context.close()
 
 
 def _extract_from_html(html: str, url: str) -> dict:
-    """
-    Extract clean text content from rendered HTML using BeautifulSoup.
-
-    Uses the same extraction logic as the httpx-based scraper
-    so the resulting format is identical.
-    """
+    """Extract clean text content from rendered HTML using BeautifulSoup."""
     soup = BeautifulSoup(html, "html.parser")
 
-    # Remove non-content elements (navbar, footer, sidebar, etc.)
     for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
         tag.decompose()
 
-    # Title
     title = soup.title.string.strip() if soup.title and soup.title.string else url
 
-    # Prefer <main>, then <article>, then <body>
     main = soup.find("main") or soup.find("article") or soup.find("body") or soup
 
     lines: list[str] = []
@@ -92,145 +181,98 @@ def _extract_from_html(html: str, url: str) -> dict:
     return {"url": url, "title": title, "content": content, "raw_html": html}
 
 
-async def _discover_links(page, base_url: str) -> list[str]:
-    """Extract all internal link URLs from the rendered page."""
-    parsed_base = urlparse(base_url)
-    base_domain = parsed_base.netloc
+# ══════════════════════════════════════════════════════════
+#  Public async API (async wrappers over single-thread executor)
+# ══════════════════════════════════════════════════════════
 
-    # Get all anchor hrefs from the rendered DOM (JS-executed)
-    hrefs = await page.evaluate("""() => {
-        return Array.from(document.querySelectorAll('a[href]'))
-            .map(a => a.href)
-            .filter(h => h && !h.startsWith('javascript:') && !h.startsWith('mailto:'));
-    }""")
+async def _start() -> None:
+    """Start Playwright (async wrapper)."""
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_EXECUTOR, _start_sync)
 
-    discovered: set[str] = set()
-    for href in hrefs:
-        parsed = urlparse(href)
-        # Only same-origin or protocol-relative links
-        if parsed.netloc and parsed.netloc != base_domain:
-            continue
-        if parsed.scheme and parsed.scheme not in ("http", "https"):
-            continue
-        full = urljoin(base_url, href)
-        full = full.split("#")[0]  # remove fragments
-        if full.startswith(("http://", "https://")):
-            discovered.add(full)
 
-    result = sorted(discovered)
-    logger.info("Discovered %d internal links from %s", len(result), base_url)
-    return result
+async def _stop() -> None:
+    """Stop Playwright (async wrapper)."""
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_EXECUTOR, _stop_sync)
 
 
 async def render_page(url: str, timeout: int = 30) -> dict:
-    """
-    Render a single URL with a headless browser and extract content.
-
-    Args:
-        url: The full URL to render and scrape.
-        timeout: Page load timeout in seconds.
-
-    Returns:
-        Dict with keys: url, title, content.
-    """
-    await _start()
-    context = await _BROWSER.new_context(
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-    )
-    page_page = await context.new_page()
-
-    try:
-        logger.info("Rendering %s with Playwright ...", url)
-        await page_page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
-        # Extra wait for React deferred rendering / lazy components
-        await page_page.wait_for_timeout(2500)
-
-        html = await page_page.content()
-        result = _extract_from_html(html, url)
-        logger.info(
-            "Rendered %s — title=%.60s, content=%d chars",
-            url, result["title"], len(result["content"]),
-        )
-        return result
-    except Exception as exc:
-        logger.error("Failed to render %s: %s", url, exc)
-        return {"url": url, "title": url, "content": f"[Render failed: {exc}]"}
-    finally:
-        await page_page.close()
-        await context.close()
+    """Render a single URL with Playwright (async wrapper)."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_EXECUTOR, _render_page_sync, url, timeout)
 
 
-async def scrape_site(base_url: str, max_concurrency: int = 3) -> dict:
+async def _discover_links(base_url: str) -> list[str]:
+    """Discover all internal links from the base page (async wrapper)."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_EXECUTOR, _discover_links_sync, base_url)
+
+
+# ══════════════════════════════════════════════════════════
+#  Site scraper (full pipeline)
+# ══════════════════════════════════════════════════════════
+
+async def scrape_site(
+    base_url: str,
+    max_pages: int = 25,
+    page_timeout: int = 20,
+) -> dict:
     """
     Scrape an entire site in one shot.
 
     Pipeline:
       1. Render the base URL to discover all internal links
-      2. Render every discovered page (up to max_concurrency in parallel)
+      2. Render each discovered page sequentially
       3. Return results and any errors
 
-    Args:
-        base_url: The starting URL (e.g. http://localhost:5174).
-        max_concurrency: Max parallel page renders.
-
-    Returns:
-        Dict with:
-          - pages: list of {url, title, content}
-          - total: number of successfully scraped pages
-          - errors: list of error messages
-          - base_url: the original base URL
+    Pages are rendered one at a time via a single-thread sync executor
+    (avoids Windows NotImplementedError and greenlet thread-switching errors).
     """
     await _start()
 
-    # ── Step 1: Render base page & discover links ──
+    # ── Step 1: Crawl (discover links) ──
     logger.info("Crawl phase — rendering %s to discover pages...", base_url)
-    context = await _BROWSER.new_context()
-    page_crawl = await context.new_page()
 
     try:
-        await page_crawl.goto(base_url, wait_until="networkidle", timeout=30000)
-        await page_crawl.wait_for_timeout(2500)
-        all_urls = await _discover_links(page_crawl, base_url)
-
-        # Always include the base URL itself
+        all_urls = await _discover_links(base_url)
         base_clean = base_url.rstrip("/")
         if base_clean not in all_urls:
             all_urls.insert(0, base_clean)
-
-        logger.info("Will scrape %d pages from site %s", len(all_urls), base_url)
+        logger.info(
+            "Discovered %d internal links from %s (capped at max_pages=%d)",
+            len(all_urls), base_url, max_pages,
+        )
     except Exception as exc:
         logger.error("Crawl of %s failed: %s", base_url, exc)
         return {"pages": [], "total": 0, "errors": [str(exc)], "base_url": base_url}
-    finally:
-        await page_crawl.close()
-        await context.close()
 
-    # ── Step 2: Scrape all discovered pages in parallel ──
-    semaphore = asyncio.Semaphore(max_concurrency)
+    # ── Step 2: Limit to max_pages ──
+    urls_to_scrape = all_urls[:max_pages]
+    logger.info(
+        "Scraping %d / %d pages from %s (timeout=%ds)",
+        len(urls_to_scrape), len(all_urls), base_url, page_timeout,
+    )
 
-    async def _scrape_one(u: str) -> dict:
-        async with semaphore:
-            return await render_page(u)
-
-    tasks = [_scrape_one(u) for u in all_urls]
-    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
-
+    # ── Step 3: Scrape each page (sequentially via single-thread executor) ──
     pages: list[dict] = []
     errors: list[str] = []
-    for r in raw_results:
-        if isinstance(r, Exception):
-            errors.append(str(r))
-        elif isinstance(r, dict):
-            pages.append(r)
 
-    logger.info("Site scrape complete: %d pages, %d errors", len(pages), len(errors))
+    for i, u in enumerate(urls_to_scrape):
+        result = await render_page(u, timeout=page_timeout)
+        if result.get("content", "").startswith("[Render failed"):
+            errors.append(f"{u}: {result['content']}")
+        else:
+            pages.append(result)
+        logger.info(
+            "Progress: %d/%d pages scraped from %s",
+            len(pages) + len(errors), len(urls_to_scrape), base_url,
+        )
 
-    # Cleanup the browser
-    await _stop()
+    logger.info(
+        "Site scrape complete: %d pages, %d errors (from %d discovered)",
+        len(pages), len(errors), len(all_urls),
+    )
 
     return {
         "pages": pages,
