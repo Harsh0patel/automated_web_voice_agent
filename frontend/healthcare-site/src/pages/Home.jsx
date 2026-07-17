@@ -1,70 +1,64 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { preloadPage } from '../utils/preload.js';
+import useScrapedComponents from '../hooks/useScrapedComponents.js';
 import './Home.css';
 
-const features = [
-  {
-    icon: '🚑',
-    title: '24/7 Emergency Care',
-    desc: 'Round-the-clock emergency services with rapid response teams and state-of-the-art trauma care.',
-  },
-  {
-    icon: '❤️',
-    title: 'Cardiology',
-    desc: 'Comprehensive heart care with advanced diagnostics, interventional procedures, and rehabilitation.',
-  },
-  {
-    icon: '🧠',
-    title: 'Neurology',
-    desc: 'Expert neurological care for conditions affecting the brain, spine, and nervous system.',
-  },
-  {
-    icon: '🦴',
-    title: 'Orthopedics',
-    desc: 'Complete musculoskeletal care from sports injuries to joint replacements and rehabilitation.',
-  },
-  {
-    icon: '👶',
-    title: 'Pediatrics',
-    desc: 'Family-centered pediatric care covering everything from well-child visits to complex conditions.',
-  },
-  {
-    icon: '🔬',
-    title: 'Diagnostic Imaging',
-    desc: 'Advanced imaging technology including MRI, CT scans, ultrasound, and digital X-ray services.',
-  },
+// ── Fallback data (used when scraped data is unavailable) ──
+const FALLBACK_FEATURES = [
+  { icon: '🚑', title: '24/7 Emergency Care', desc: 'Round-the-clock emergency services with rapid response teams and state-of-the-art trauma care.' },
+  { icon: '❤️', title: 'Cardiology', desc: 'Comprehensive heart care with advanced diagnostics, interventional procedures, and rehabilitation.' },
+  { icon: '🧠', title: 'Neurology', desc: 'Expert neurological care for conditions affecting the brain, spine, and nervous system.' },
+  { icon: '🦴', title: 'Orthopedics', desc: 'Complete musculoskeletal care from sports injuries to joint replacements and rehabilitation.' },
+  { icon: '👶', title: 'Pediatrics', desc: 'Family-centered pediatric care covering everything from well-child visits to complex conditions.' },
+  { icon: '🔬', title: 'Diagnostic Imaging', desc: 'Advanced imaging technology including MRI, CT scans, ultrasound, and digital X-ray services.' },
 ];
 
-const stats = [
+const FALLBACK_STATS = [
   { value: '25+', label: 'Years Experience' },
   { value: '50K+', label: 'Patients Treated' },
   { value: '200+', label: 'Expert Doctors' },
   { value: '98%', label: 'Patient Satisfaction' },
 ];
 
-const testimonials = [
-  {
-    name: 'Sarah Johnson',
-    role: 'Patient',
-    text: 'The care I received at MediCare+ was exceptional. From the moment I walked in, every staff member was compassionate and professional. Truly a life-changing experience.',
-    rating: 5,
-  },
-  {
-    name: 'Michael Chen',
-    role: 'Patient',
-    text: 'After years of searching for the right treatment, the cardiology team at MediCare+ finally gave me my life back. I cannot recommend them enough.',
-    rating: 5,
-  },
-  {
-    name: 'Emily Rodriguez',
-    role: 'Patient Family Member',
-    text: 'My mother received outstanding care during her stay. The doctors kept us informed every step of the way. So grateful for this incredible team.',
-    rating: 5,
-  },
+const FALLBACK_TESTIMONIALS = [
+  { name: 'Sarah Johnson', role: 'Patient', text: 'The care I received at MediCare+ was exceptional.', rating: 5 },
+  { name: 'Michael Chen', role: 'Patient', text: 'The cardiology team at MediCare+ gave me my life back.', rating: 5 },
+  { name: 'Emily Rodriguez', role: 'Patient Family Member', text: 'My mother received outstanding care.', rating: 5 },
 ];
 
 export default function Home() {
+  const { byType } = useScrapedComponents();
+
+  // Build features from scraped 'service' components, fallback to hardcoded
+  const scrapedServices = byType('service');
+  const features = scrapedServices.length > 0
+    ? scrapedServices.map(s => ({
+        icon: s.metadata?.attributes?.icon || '🔬',
+        title: s.content,
+        desc: s.metadata?.description || '',
+      }))
+    : FALLBACK_FEATURES;
+
+  // Build stats from scraped 'stat' components, fallback to hardcoded
+  const scrapedStats = byType('stat');
+  const stats = scrapedStats.length > 0
+    ? scrapedStats.map(s => ({
+        value: s.content,
+        label: s.metadata?.label || '',
+      }))
+    : FALLBACK_STATS;
+
+  // Build testimonials from scraped 'testimonial' components, fallback to hardcoded
+  const scrapedTestimonials = byType('testimonial');
+  const testimonials = scrapedTestimonials.length > 0
+    ? scrapedTestimonials.map(t => ({
+        name: t.metadata?.name || 'Patient',
+        role: t.metadata?.role || '',
+        text: t.content,
+        rating: t.metadata?.rating || 5,
+      }))
+    : FALLBACK_TESTIMONIALS;
   return (
     <>
       {/* ========== HERO ========== */}
@@ -178,7 +172,7 @@ export default function Home() {
       </section>
 
       {/* ========== TESTIMONIALS ========== */}
-      <section className="section testimonials">
+      <section id="testimonials" className="section testimonials">
         <div className="container">
           <div className="section-header animate-in">
             <span className="section-tag">Testimonials</span>

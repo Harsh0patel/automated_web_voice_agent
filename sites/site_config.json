@@ -1,0 +1,167 @@
+{
+  "base_url": "http://localhost:5174",
+  "name": "MediCare+",
+  "version": "1.0.0",
+
+  "semantic_selectors": {
+    ".feature-card": { "type": "service", "section": "features" },
+    ".service-card": { "type": "service", "section": "services_page" },
+    ".doctor-card": { "type": "doctor", "section": "doctors_page" },
+    ".testimonial-card": { "type": "testimonial", "section": "testimonials" },
+    ".stat-item": { "type": "stat", "section": "stats" },
+    ".plan-card": { "type": "insurance_plan", "section": "insurance_plans" },
+    ".blog-card": { "type": "blog_post", "section": "blog" },
+    ".job-card": { "type": "job", "section": "jobs" },
+    ".med-card": { "type": "medication", "section": "medications" },
+    ".pharm-service-card": { "type": "pharmacy_service", "section": "pharmacy_services" },
+    ".timeline__item": { "type": "milestone", "section": "timeline" },
+    ".value-card": { "type": "value", "section": "values" },
+    ".faq__item": { "type": "faq", "section": "faqs" },
+    ".contact-info-card": { "type": "contact_info", "section": "contact" },
+    ".coverage__card": { "type": "coverage_item", "section": "coverage" },
+    ".benefit-card": { "type": "benefit", "section": "benefits" },
+    ".why-choose__card": { "type": "why_choose", "section": "why_choose" },
+    ".feature-card__link": { "type": "link", "section": "features" },
+    "section.hero": { "type": "hero", "section": "hero" },
+    ".cta-banner": { "type": "cta", "section": "cta" }
+  },
+
+  "section_classes": {
+    "features__grid": "features",
+    "services-page__grid": "services_page",
+    "doctors__grid": "doctors_page",
+    "testimonials__grid": "testimonials",
+    "stats__grid": "stats",
+    "plans__grid": "insurance_plans",
+    "blog__grid": "blog",
+    "jobs__list": "jobs",
+    "meds__grid": "medications",
+    "pharm-services__grid": "pharmacy_services",
+    "timeline": "timeline",
+    "values__grid": "values",
+    "faq__list": "faqs",
+    "coverage__grid": "coverage",
+    "benefits__grid": "benefits",
+    "why-choose__grid": "why_choose"
+  },
+
+  "page_mappings": {
+    "booking": "/booking",
+    "appointment": "/booking",
+    "reserve": "/booking",
+    "schedule": "/booking",
+    "doctors": "/doctors",
+    "services": "/services",
+    "contact": "/contact",
+    "insurance": "/insurance",
+    "blog": "/blog",
+    "pharmacy": "/pharmacy",
+    "medication": "/pharmacy",
+    "careers": "/careers",
+    "jobs": "/careers",
+    "about": "/about"
+  },
+
+  "scrollable_sections": {
+    "#testimonials": "Patient Testimonials",
+    ".features": "Our Services",
+    ".stats-section": "Statistics",
+    ".cta-banner": "Call to Action",
+    ".services-page": "Services List",
+    ".doctors-page": "Doctors List",
+    ".insurance-plans": "Insurance Plans",
+    ".faq-section": "FAQ",
+    ".medications-section": "Medications",
+    ".jobs-section": "Open Positions",
+    ".benefits-section": "Benefits",
+    ".timeline-section": "Milestones",
+    ".values": "Our Values",
+    ".why-choose": "Why Choose Us",
+    ".coverage": "Coverage",
+    ".about-intro": "About Introduction",
+    ".culture": "Our Culture",
+    ".contact-page": "Contact Information",
+    ".booking-section": "Booking Form",
+    ".blog-page": "Blog Articles"
+  },
+
+  "action_buttons": {
+    "confirm_appointment": "button[type=\"submit\"]#booking-form, form#booking-form button[type=\"submit\"]",
+    "submit_form": "form button[type=\"submit\"], input[type=\"submit\"]",
+    "book_appointment": "a[href=\"/booking\"].btn-primary"
+  },
+
+  "form_params": {
+    "booking_service": "select#service, .booking__service-card",
+    "booking_doctor": "select#doctor, .booking__doctor-card",
+    "booking_date": "input#date, .booking__cal-day",
+    "booking_time": "select#time, .booking__timeslot",
+    "patient_name": "input#b-name, input#name",
+    "patient_email": "input#b-email, input#email",
+    "patient_phone": "input#b-phone, input#phone",
+    "patient_notes": "input#b-notes, textarea#message"
+  },
+
+  "component_parsers": {
+    "doctor_fields": {
+      "name": ".doctor-card__name",
+      "specialty": ".doctor-card__specialty",
+      "experience": ".doctor-card__exp",
+      "description": ".doctor-card__desc"
+    },
+    "service_fields": {
+      "title": ["h3", "h4"],
+      "description": "p",
+      "icon": [".feature-card__icon", ".service-card__icon"],
+      "features": "ul li",
+      "link": "a"
+    },
+    "testimonial_fields": {
+      "text": ".testimonial-card__text",
+      "author": ".testimonial-card__author",
+      "stars": ".testimonial-card__stars",
+      "role": "small"
+    },
+    "faq_fields": {
+      "question": ".faq__question",
+      "answer": ".faq__answer"
+    },
+    "insurance_plan_fields": {
+      "name": ".plan-card__name",
+      "price": ".plan-card__amount",
+      "period": ".plan-card__period",
+      "description": ".plan-card__desc",
+      "badge": ".plan-card__badge",
+      "features": "li"
+    },
+    "blog_fields": {
+      "title": ".blog-card__title",
+      "excerpt": ".blog-card__excerpt",
+      "author": ".blog-card__author",
+      "category": ".blog-card__category",
+      "meta": ".blog-card__meta"
+    },
+    "job_fields": {
+      "title": ".job-card__title",
+      "description": ".job-card__desc",
+      "tags": ".job-card__tag"
+    },
+    "medication_fields": {
+      "name": ".med-card__name",
+      "description": ".med-card__desc",
+      "price": ".med-card__price",
+      "category": ".med-card__category"
+    },
+    "stat_fields": {
+      "value": ".stat-value",
+      "label": ".stat-label"
+    }
+  },
+
+  "navigation_patterns": {
+    "form_pages": ["/booking", "/contact"],
+    "listing_pages": ["/doctors", "/services", "/blog", "/pharmacy", "/careers", "/insurance"],
+    "detail_pages": [],
+    "info_pages": ["/about", "/"]
+  }
+}

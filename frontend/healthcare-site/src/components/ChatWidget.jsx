@@ -1,6 +1,22 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// ── Generate or retrieve a persistent session ID ──
+function getSessionId() {
+  const key = 'hcw-session-id';
+  let sid = localStorage.getItem(key);
+  if (!sid) {
+    sid = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+    localStorage.setItem(key, sid);
+  }
+  return sid;
+}
+
+const SESSION_ID = getSessionId();
+
 export default function ChatWidget() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -61,6 +77,11 @@ export default function ChatWidget() {
 
   function send(data) {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      if (typeof data === 'object') {
+        // Always include session_id and current page path
+        data.session_id = SESSION_ID;
+        data.current_path = window.location.pathname;
+      }
       wsRef.current.send(typeof data === 'string' ? data : JSON.stringify(data));
     }
   }
@@ -76,16 +97,18 @@ export default function ChatWidget() {
         setIsTyping(true);
         break;
       case 'transcription_complete':
-        addMessage('user', `🎤 "${data.transcript}"`);
+        addMessage('user', `🎤 \"${data.transcript}\"`);
         break;
       case 'db_results_found':
         break;
       case 'query_result':
         setIsTyping(false);
         if (data.message) addMessage('assistant', data.message);
-        // Execute action if the LLM provided one
-        if (data.action) {
-          executeAction(data.action);
+        // Execute action(s): prefer 'actions' array over single 'action'
+        if (data.actions && data.actions.length > 0) {
+          executeActions(data.actions);
+        } else if (data.action) {
+          executeActions([data.action]);
         }
         if (data.tts_error) addMessage('system', `⚠️ Voice: ${data.tts_error}`);
         break;
@@ -96,9 +119,37 @@ export default function ChatWidget() {
     }
   }
 
-  // ── Execute LLM actions (navigate, scroll, etc.) ──
+  // ── Helper: safely get a DOM element and warn if missing ──
+  function getEl(selector, label) {
+    if (!selector) {
+      addMessage('system', `⚠️ Missing selector for ${label || 'action'}`);
+      return null;
+    }
+    const el = document.querySelector(selector);
+    if (!el) {
+      addMessage('system', `⚠️ Could not find ${label || selector}`);
+    }
+    return el;
+  }
+
+  // ── Helper: try an operation and report success/failure ──
+  function safeOperate(selector, actionLabel, actionFn) {
+    const el = getEl(selector, actionLabel);
+    if (!el) return;
+    try {
+      const result = actionFn(el);
+      if (result !== false) {
+        addMessage('system', `✅ ${actionLabel}`);
+      }
+    } catch (err) {
+      addMessage('system', `❌ ${actionLabel} failed: ${err.message}`);
+    }
+  }
+
+  // ── Execute LLM actions (navigate, scroll, submit, click, fill, select, check, focus, wait) ──
   function executeAction(action) {
     if (!action || !action.type) return;
+
     switch (action.type) {
       case 'navigate':
         if (action.path) {
@@ -106,16 +157,168 @@ export default function ChatWidget() {
           addMessage('system', `📍 Navigating to ${action.path}...`);
         }
         break;
+
       case 'scroll':
         if (action.selector) {
-          const el = document.querySelector(action.selector);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            addMessage('system', `👆 Scrolling to ${action.selector}...`);
-          }
+          safeOperate(action.selector, '👆 Scrolling to section', (el) => {
+            // Account for fixed navbar height (76px)
+            const y = el.getBoundingClientRect().top + window.scrollY - 80;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+          });
         }
         break;
+
+      case 'submit': {
+        // Try the provided selector, or fall back to any form on the page
+        const formEl = action.selector
+          ? getEl(action.selector, 'form')
+          : document.querySelector('form');
+        if (!formEl) {
+          addMessage('system', '⚠️ Could not find form');
+          break;
+        }
+        try {
+          const submitBtn = formEl.querySelector('button[type="submit"], input[type="submit"]');
+          if (submitBtn) {
+            submitBtn.click();
+          } else {
+            formEl.dispatchEvent(new Event('submit', { cancelable: true }));
+          }
+          addMessage('system', '✅ Form submitted');
+        } catch (err) {
+          addMessage('system', `❌ Submit failed: ${err.message}`);
+        }
+        break;
+      }
+
+      case 'click':
+        safeOperate(action.selector, 'Clicked element', (el) => {
+          // React Router <Link> doesn't respond to .click(); dispatch a MouseEvent
+          if (el.tagName === 'A') {
+            const href = el.getAttribute('href');
+            if (href) {
+              if (href.startsWith('/')) {
+                // Internal route — use React Router navigation
+                navigate(href);
+              } else {
+                // External link — let the browser handle it via MouseEvent
+                el.dispatchEvent(new MouseEvent('click', {
+                  bubbles: true, cancelable: true, button: 0,
+                }));
+              }
+              return true;
+            }
+          }
+          el.dispatchEvent(new MouseEvent('click', {
+            bubbles: true, cancelable: true, button: 0,
+          }));
+        });
+        break;
+
+      case 'fill': {
+        const val = action.value;
+        if (val === undefined || !action.selector) break;
+        safeOperate(action.selector, `✏️ Filled with "${val}"`, (el) => {
+          const tag = el.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA') {
+            // Use native value setter to bypass React's controlled input interception
+            const setter =
+              Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ??
+              Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+            if (setter) {
+              setter.call(el, val);
+            } else {
+              el.value = val;
+            }
+            // Dispatch both events that React listens to
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          } else {
+            // contenteditable or other element
+            el.textContent = val;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+        break;
+      }
+
+      case 'select':
+        safeOperate(action.selector, `📋 Selected "${action.value}"`, (el) => {
+          if (el.tagName !== 'SELECT') return false;
+          if (el.multiple) {
+            // For multi-select, clear all and select the specified value
+            Array.from(el.options).forEach(opt => opt.selected = false);
+            const target = Array.from(el.options).find(o => o.value === action.value);
+            if (target) target.selected = true;
+          } else {
+            el.value = action.value;
+          }
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        break;
+
+      case 'check':
+        safeOperate(action.selector, `☑️ ${action.checked ? 'Checked' : 'Unchecked'}`, (el) => {
+          if (el.type === 'checkbox') {
+            el.checked = Boolean(action.checked);
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          } else if (el.getAttribute('role') === 'switch' || el.getAttribute('aria-checked') !== null) {
+            // Handle custom toggle/switch components
+            el.setAttribute('aria-checked', String(Boolean(action.checked)));
+            el.dispatchEvent(new Event('click', { bubbles: true }));
+          }
+        });
+        break;
+
+      case 'focus':
+        safeOperate(action.selector, '🎯 Focused', (el) => {
+          el.focus({ preventScroll: false });
+        });
+        break;
+
+      case 'wait':
+        // Wait action is async but executeAction is sync.
+        // The backend should handle timing by sending actions sequentially.
+        addMessage('system', `⏳ Waiting ${action.delay || action.ms || 1000}ms...`);
+        break;
+
+      case 'action':
+        // The typed actions above (click, fill, select, check, focus) cover
+        // every DOM operation the LLM could reasonably need. The 'action'
+        // type is kept for forward compatibility — the backend should convert
+        // generic action scripts into typed actions before sending.
+        if (action.script) {
+          addMessage('system', `⚡ Custom action received. Please use click/fill/select actions for direct DOM interaction.`);
+        }
+        break;
+
+      default:
+        addMessage('system', `🤔 Unknown action type: ${action.type}. Available: navigate, scroll, submit, click, fill, select, check, focus`);
     }
+  }
+
+  // ── Execute a sequence of actions with delays between them ──
+  async function executeActions(actions) {
+    if (!actions || actions.length === 0) return;
+    addMessage('system', `⏳ Executing ${actions.length} step(s)...`);
+    for (let i = 0; i < actions.length; i++) {
+      const act = actions[i];
+      // Handle wait/delay actions specially
+      if (act.type === 'wait') {
+        const ms = act.delay || act.ms || 1000;
+        addMessage('system', `⏳ Waiting ${ms}ms...`);
+        await new Promise(resolve => setTimeout(resolve, ms));
+        continue;
+      }
+      // Execute the action synchronously
+      executeAction(act);
+      // After navigation or any DOM change, let React re-render before the next step
+      // Skip extra wait for 'wait' actions since they handle their own timing
+      if (act.type !== 'wait') {
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+    }
+    addMessage('system', '✅ All steps completed');
   }
 
   // ── Send text ──

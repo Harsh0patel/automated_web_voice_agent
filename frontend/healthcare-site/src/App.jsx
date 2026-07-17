@@ -17,6 +17,7 @@ const Blog = React.lazy(() => import('./pages/Blog.jsx'));
 const Careers = React.lazy(() => import('./pages/Careers.jsx'));
 const Pharmacy = React.lazy(() => import('./pages/Pharmacy.jsx'));
 const Booking = React.lazy(() => import('./pages/Booking.jsx'));
+const DynamicContent = React.lazy(() => import('./pages/DynamicContent.jsx'));
 const NotFound = React.lazy(() => import('./pages/NotFound.jsx'));
 
 const STORAGE_THEME = 'medicare-theme';
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/careers" element={<Careers />} />
             <Route path="/pharmacy" element={<Pharmacy />} />
             <Route path="/booking" element={<Booking />} />
+            <Route path="/scraped" element={<DynamicContent />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

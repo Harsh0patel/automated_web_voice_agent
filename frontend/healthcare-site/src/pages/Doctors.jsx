@@ -1,78 +1,64 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import useScrapedComponents from '../hooks/useScrapedComponents.js';
 import './Doctors.css';
 
-const doctors = [
-  {
-    name: 'Dr. Sarah Mitchell',
-    specialty: 'Cardiology',
-    exp: '18 years',
-    desc: 'Leading cardiologist specializing in interventional cardiology and heart failure management.',
-    avatar: 'SM',
-    color: '#0d9488',
-  },
-  {
-    name: 'Dr. James Wilson',
-    specialty: 'Neurology',
-    exp: '15 years',
-    desc: 'Expert neurologist focused on stroke care, epilepsy, and neurodegenerative disorders.',
-    avatar: 'JW',
-    color: '#0891b2',
-  },
-  {
-    name: 'Dr. Emily Park',
-    specialty: 'Pediatrics',
-    exp: '12 years',
-    desc: 'Compassionate pediatrician dedicated to children\'s health from infancy through adolescence.',
-    avatar: 'EP',
-    color: '#7c3aed',
-  },
-  {
-    name: 'Dr. Robert Chen',
-    specialty: 'Orthopedics',
-    exp: '20 years',
-    desc: 'Renowned orthopedic surgeon specializing in joint replacement and sports medicine.',
-    avatar: 'RC',
-    color: '#ea580c',
-  },
-  {
-    name: 'Dr. Lisa Thompson',
-    specialty: 'Oncology',
-    exp: '14 years',
-    desc: 'Oncologist committed to personalized cancer care with cutting-edge treatment approaches.',
-    avatar: 'LT',
-    color: '#dc2626',
-  },
-  {
-    name: 'Dr. Michael Rivera',
-    specialty: 'Pulmonology',
-    exp: '16 years',
-    desc: 'Pulmonology specialist focused on respiratory diseases and sleep medicine.',
-    avatar: 'MR',
-    color: '#ca8a04',
-  },
-  {
-    name: 'Dr. Anna Kowalski',
-    specialty: 'Ophthalmology',
-    exp: '11 years',
-    desc: 'Skilled ophthalmologist providing advanced eye care and vision correction procedures.',
-    avatar: 'AK',
-    color: '#0891b2',
-  },
-  {
-    name: 'Dr. David Okafor',
-    specialty: 'Emergency Medicine',
-    exp: '13 years',
-    desc: 'Experienced emergency physician leading trauma response and critical care teams.',
-    avatar: 'DO',
-    color: '#0d9488',
-  },
+// ── Fallback data ──
+const FALLBACK_DOCTORS = [
+  { name: 'Dr. Sarah Mitchell', specialty: 'Cardiology', exp: '18 years', desc: 'Leading cardiologist.', avatar: 'SM', color: '#0d9488' },
+  { name: 'Dr. James Wilson', specialty: 'Neurology', exp: '15 years', desc: 'Expert neurologist.', avatar: 'JW', color: '#0891b2' },
+  { name: 'Dr. Emily Park', specialty: 'Pediatrics', exp: '12 years', desc: 'Compassionate pediatrician.', avatar: 'EP', color: '#7c3aed' },
+  { name: 'Dr. Robert Chen', specialty: 'Orthopedics', exp: '20 years', desc: 'Renowned orthopedic surgeon.', avatar: 'RC', color: '#ea580c' },
+  { name: 'Dr. Lisa Thompson', specialty: 'Oncology', exp: '14 years', desc: 'Oncologist.', avatar: 'LT', color: '#dc2626' },
+  { name: 'Dr. Michael Rivera', specialty: 'Pulmonology', exp: '16 years', desc: 'Pulmonology specialist.', avatar: 'MR', color: '#ca8a04' },
+  { name: 'Dr. Anna Kowalski', specialty: 'Ophthalmology', exp: '11 years', desc: 'Skilled ophthalmologist.', avatar: 'AK', color: '#0891b2' },
+  { name: 'Dr. David Okafor', specialty: 'Emergency Medicine', exp: '13 years', desc: 'Experienced emergency physician.', avatar: 'DO', color: '#0d9488' },
 ];
 
-const specialties = [...new Set(doctors.map(d => d.specialty))];
+const AVATAR_COLORS = ['#0d9488', '#0891b2', '#7c3aed', '#ea580c', '#dc2626', '#ca8a04'];
 
 export default function Doctors() {
-  const [activeSpecialty, setActiveSpecialty] = React.useState('All');
+  const { byType } = useScrapedComponents();
+
+  // Build doctors from scraped 'doctor' components, fallback to hardcoded
+  const scrapedDocs = byType('doctor');
+  const doctors = scrapedDocs.length > 0
+    ? scrapedDocs.map(d => ({
+        name: d.content,
+        specialty: d.metadata?.specialty || 'General',
+        exp: d.metadata?.experience || '',
+        desc: d.metadata?.description || '',
+        avatar: d.content.split(' ').map(n => n[0]).join('').slice(0, 2),
+        color: AVATAR_COLORS[d.content.length % AVATAR_COLORS.length],
+      }))
+    : FALLBACK_DOCTORS;
+
+  const specialties = [...new Set(doctors.map(d => d.specialty))];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeSpecialty, setActiveSpecialty] = React.useState(() => {
+    const fromUrl = searchParams.get('specialty');
+    return fromUrl && specialties.includes(fromUrl) ? fromUrl : 'All';
+  });
+
+  // Sync URL → filter state whenever search params change
+  // (handles both initial load AND subsequent navigations from the AI)
+  useEffect(() => {
+    const fromUrl = searchParams.get('specialty');
+    if (fromUrl && specialties.includes(fromUrl)) {
+      setActiveSpecialty(fromUrl);
+    }
+    // No else — if URL has no specialty, keep current user selection
+  }, [searchParams]);
+
+  // Sync filter state → URL when user clicks a tab
+  function handleSpecialtyChange(specialty) {
+    setActiveSpecialty(specialty);
+    if (specialty === 'All') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ specialty });
+    }
+  }
 
   const filtered = activeSpecialty === 'All'
     ? doctors
@@ -98,7 +84,7 @@ export default function Doctors() {
           <div className="doctors-filter__tabs animate-in">
             <button
               className={`doctors-filter__tab ${activeSpecialty === 'All' ? 'active' : ''}`}
-              onClick={() => setActiveSpecialty('All')}
+              onClick={() => handleSpecialtyChange('All')}
             >
               All Doctors
             </button>
@@ -106,7 +92,7 @@ export default function Doctors() {
               <button
                 key={s}
                 className={`doctors-filter__tab ${activeSpecialty === s ? 'active' : ''}`}
-                onClick={() => setActiveSpecialty(s)}
+                onClick={() => handleSpecialtyChange(s)}
               >
                 {s}
               </button>

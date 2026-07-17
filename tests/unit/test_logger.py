@@ -12,7 +12,7 @@ class TestSetupLogging:
 
     def test_setup_default_level(self):
         """Default log level should be INFO."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         setup_logging(level="INFO")
 
@@ -21,7 +21,7 @@ class TestSetupLogging:
 
     def test_setup_debug_level(self):
         """Should respect DEBUG log level."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         setup_logging(level="DEBUG")
 
@@ -30,7 +30,7 @@ class TestSetupLogging:
 
     def test_setup_invalid_level_falls_back(self):
         """Invalid log level should fall back to INFO."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         setup_logging(level="INVALID")
 
@@ -39,7 +39,7 @@ class TestSetupLogging:
 
     def test_setup_clears_existing_handlers(self):
         """Should clear existing handlers before adding new ones."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         root = logging.getLogger()
         root.addHandler(logging.StreamHandler(sys.stdout))
@@ -52,7 +52,7 @@ class TestSetupLogging:
 
     def test_console_handler_output(self):
         """The console handler should output to stdout."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         setup_logging(level="DEBUG")
 
@@ -64,7 +64,7 @@ class TestSetupLogging:
 
     def test_file_handler_added_when_specified(self, tmp_path):
         """Should add a file handler when log_file is specified."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         log_file = tmp_path / "test.log"
         setup_logging(level="INFO", log_file=str(log_file))
@@ -76,7 +76,7 @@ class TestSetupLogging:
 
     def test_no_file_handler_by_default(self):
         """Should not add a file handler by default."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         setup_logging(level="INFO")
 
@@ -86,7 +86,7 @@ class TestSetupLogging:
 
     def test_quiets_noisy_libraries(self):
         """Noisy libraries should be set to WARNING level."""
-        from backend.core.logger import setup_logging
+        from backend.app.logger import setup_logging
 
         setup_logging(level="DEBUG")
 
@@ -96,7 +96,7 @@ class TestSetupLogging:
 
     def test_logger_actually_logs(self):
         """The logger should actually output log messages."""
-        from backend.core.logger import setup_logging, get_logger
+        from backend.app.logger import setup_logging, get_logger
 
         setup_logging(level="INFO")
 
@@ -106,7 +106,7 @@ class TestSetupLogging:
 
     def test_logger_respects_level(self):
         """The logger should respect the configured level."""
-        from backend.core.logger import setup_logging, get_logger
+        from backend.app.logger import setup_logging, get_logger
 
         setup_logging(level="ERROR")
 

@@ -10,56 +10,25 @@ class TestLoadSystemPrompt:
     """Tests for load_system_prompt function."""
 
     @pytest.mark.asyncio
-    async def test_loads_from_file(self, tmp_path):
-        """Should load the system prompt from the prompt file."""
-        import backend.core.config as cfg
-
-        prompt_file = tmp_path / "system_prompt.txt"
-        prompt_file.write_text("You are a helpful assistant.")
-
-        original = cfg.PROMPT_FILE
-        cfg.PROMPT_FILE = prompt_file
-
-        from backend.LLM_CLIENT.openai_client import load_system_prompt
-        try:
-            result = await load_system_prompt()
-            assert result == "You are a helpful assistant."
-        finally:
-            cfg.PROMPT_FILE = original
+    async def test_returns_default_prompt(self):
+        """Should load the prompt from the .txt file."""
+        from backend.clients.llm.openai import load_system_prompt
+        from pathlib import Path
+        prompt_path = Path(__file__).resolve().parent.parent.parent / "backend" / "prompts" / "default_system_prompt.txt"
+        expected = prompt_path.read_text(encoding="utf-8").strip() if prompt_path.exists() else ""
+        result = await load_system_prompt()
+        assert result == expected
 
     @pytest.mark.asyncio
-    async def test_returns_empty_if_file_missing(self, tmp_path):
-        """Should return empty string if prompt file doesn't exist."""
-        import backend.core.config as cfg
-
-        prompt_file = tmp_path / "nonexistent.txt"
-        original = cfg.PROMPT_FILE
-        cfg.PROMPT_FILE = prompt_file
-
-        from backend.LLM_CLIENT.openai_client import load_system_prompt
-        try:
-            result = await load_system_prompt()
-            assert result == ""
-        finally:
-            cfg.PROMPT_FILE = original
-
-    @pytest.mark.asyncio
-    async def test_returns_empty_if_file_empty(self, tmp_path):
-        """Should return empty string if prompt file is empty."""
-        import backend.core.config as cfg
-
-        prompt_file = tmp_path / "system_prompt.txt"
-        prompt_file.write_text("")
-
-        original = cfg.PROMPT_FILE
-        cfg.PROMPT_FILE = prompt_file
-
-        from backend.LLM_CLIENT.openai_client import load_system_prompt
-        try:
-            result = await load_system_prompt()
-            assert result == ""
-        finally:
-            cfg.PROMPT_FILE = original
+    async def test_default_prompt_has_required_content(self):
+        """The default prompt should contain key instructions."""
+        from backend.clients.llm.openai import load_system_prompt
+        result = await load_system_prompt()
+        assert len(result) > 100
+        assert "[Site Name]" in result
+        assert "navigate" in result
+        assert "json" in result.lower()
+        assert "message" in result
 
 
 class TestGenerateJsonFromTranscript:
@@ -68,7 +37,7 @@ class TestGenerateJsonFromTranscript:
     @pytest.mark.asyncio
     async def test_successful_generation(self, mock_openai_client):
         """Should return a dict with content, parsed, and model."""
-        from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
+        from backend.clients.llm.openai import generate_json_from_transcript
 
         result = await generate_json_from_transcript("Hello world")
 
@@ -80,21 +49,11 @@ class TestGenerateJsonFromTranscript:
         assert len(result["model"]) > 0
 
     @pytest.mark.asyncio
-    async def test_uses_system_prompt(self, mock_openai_client, tmp_path):
+    async def test_uses_system_prompt(self, mock_openai_client):
         """Should pass the system prompt as the system message."""
-        import backend.core.config as cfg
+        from backend.clients.llm.openai import generate_json_from_transcript
 
-        prompt_file = tmp_path / "system_prompt.txt"
-        prompt_file.write_text("Custom prompt.")
-
-        original = cfg.PROMPT_FILE
-        cfg.PROMPT_FILE = prompt_file
-
-        from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
-        try:
-            await generate_json_from_transcript("Hello")
-        finally:
-            cfg.PROMPT_FILE = original
+        await generate_json_from_transcript("Hello")
 
         instance = mock_openai_client.return_value
         call = instance.chat.completions.create.await_args
@@ -103,16 +62,17 @@ class TestGenerateJsonFromTranscript:
         # Find the system message
         system_msgs = [m for m in messages if m.get("role") == "system"]
         assert len(system_msgs) == 1
-        assert "Custom prompt." in system_msgs[0]["content"]
+        assert "navigate" in system_msgs[0]["content"]
+        assert "message" in system_msgs[0]["content"]
 
     @pytest.mark.asyncio
     async def test_raises_without_api_key(self, monkeypatch):
         """Without OPENAI_API_KEY, should raise ValueError."""
-        import backend.core.config as cfg
+        import backend.app.config as cfg
         original_key = cfg.OPENAI_API_KEY
         cfg.OPENAI_API_KEY = ""
 
-        from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
+        from backend.clients.llm.openai import generate_json_from_transcript
 
         try:
             with pytest.raises(ValueError, match="OPENAI_API_KEY is not set"):
@@ -130,7 +90,7 @@ class TestGenerateJsonFromTranscript:
         mock_response.choices = [mock_choice]
         instance.chat.completions.create.return_value = mock_response
 
-        from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
+        from backend.clients.llm.openai import generate_json_from_transcript
 
         result = await generate_json_from_transcript("Hello")
         assert result["parsed"] == {"intent": "greeting", "confidence": 0.95}
@@ -145,7 +105,7 @@ class TestGenerateJsonFromTranscript:
         mock_response.choices = [mock_choice]
         instance.chat.completions.create.return_value = mock_response
 
-        from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
+        from backend.clients.llm.openai import generate_json_from_transcript
 
         result = await generate_json_from_transcript("Hello")
         assert result["parsed"] == {"message": "Not valid JSON"}
@@ -153,7 +113,7 @@ class TestGenerateJsonFromTranscript:
     @pytest.mark.asyncio
     async def test_passes_transcript_in_user_message(self, mock_openai_client):
         """The transcript should be included in the user message."""
-        from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
+        from backend.clients.llm.openai import generate_json_from_transcript
 
         await generate_json_from_transcript("This is a test transcript.")
 
@@ -168,7 +128,7 @@ class TestGenerateJsonFromTranscript:
     @pytest.mark.asyncio
     async def test_response_format_json(self, mock_openai_client):
         """Should NOT pass response_format when OPENAI_JSON_MODE is false."""
-        from backend.LLM_CLIENT.openai_client import generate_json_from_transcript
+        from backend.clients.llm.openai import generate_json_from_transcript
 
         await generate_json_from_transcript("Hello")
 

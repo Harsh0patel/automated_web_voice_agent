@@ -174,7 +174,7 @@ class TestWebSocketChat:
 
     def test_chat_without_keys_returns_error(self, client):
         """Chat without OPENAI_API_KEY should return processing_started then error."""
-        import backend.core.config as cfg
+        import backend.app.config as cfg
         original = cfg.OPENAI_API_KEY
         cfg.OPENAI_API_KEY = ""
         try:

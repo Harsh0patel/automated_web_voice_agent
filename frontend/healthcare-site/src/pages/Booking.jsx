@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import BookingStepIndicator from './BookingStepIndicator.jsx';
 import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight } from '../utils/icons.jsx';
 import './Booking.css';
@@ -64,6 +64,7 @@ function getCalendarDays(year, month) {
    Component
    ============================================= */
 export default function Booking() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const today = new Date();
 
@@ -75,6 +76,127 @@ export default function Booking() {
   const [selectedTime, setSelectedTime] = useState('');
   const [patient, setPatient] = useState({ name: '', email: '', phone: '', notes: '' });
   const [confirmed, setConfirmed] = useState(false);
+
+// Convert 24h time string (e.g. "10:00", "14:30") to display format (e.g. "10:00 AM", "2:30 PM")
+function time24toDisplay(time24) {
+  const [h, m] = time24.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+  // Parse query params: ?service, ?doctor, ?date, ?time, ?step
+  // Watches searchParams so it works when React Router navigates in-place
+  useEffect(() => {
+    let newStep = null;
+    let shouldClean = false;
+
+    // Check for reset param to clear form (new booking)
+    if (searchParams.get('reset') === '1') {
+      setStep(1);
+      setSelectedService('');
+      setSelectedDoctor(null);
+      setCalYear(today.getFullYear());
+      setCalMonth(today.getMonth());
+      setSelectedDate(null);
+      setSelectedTime('');
+      setPatient({ name: '', email: '', phone: '', notes: '' });
+      setConfirmed(false);
+      setSearchParams({}, { replace: true });
+      return; // skip all other param processing
+    }
+
+    const serviceFromUrl = searchParams.get('service');
+    const doctorFromUrl = searchParams.get('doctor');
+    const dateFromUrl = searchParams.get('date');
+    const timeFromUrl = searchParams.get('time');
+    const stepFromUrl = searchParams.get('step');
+
+    // Apply service
+    if (serviceFromUrl && services.some(s => s.id === serviceFromUrl)) {
+      setSelectedService(serviceFromUrl);
+      newStep = 2;
+      shouldClean = true;
+    }
+
+    // Apply doctor (requires valid service to be selected for filtering to work)
+    if (doctorFromUrl) {
+      const docId = Number(doctorFromUrl);
+      if (!isNaN(docId) && doctors.some(d => d.id === docId)) {
+        setSelectedDoctor(docId);
+        newStep = 3;
+        shouldClean = true;
+      }
+    }
+
+    // Apply date (YYYY-MM-DD format)
+    if (dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl)) {
+      const [y, m, d] = dateFromUrl.split('-').map(Number);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        setCalYear(y);
+        setCalMonth(m - 1); // JS months are 0-indexed
+        setSelectedDate(d);
+        newStep = 3;
+        shouldClean = true;
+      }
+    }
+
+    // Apply time (24h format, e.g. "10:00" or "14:30")
+    if (timeFromUrl) {
+      const display = time24toDisplay(timeFromUrl);
+      if (display && TIME_SLOTS.includes(display)) {
+        setSelectedTime(display);
+        newStep = 3;
+        shouldClean = true;
+      }
+    }
+
+    // Apply patient name, email, phone
+    const nameFromUrl = searchParams.get('name');
+    const emailFromUrl = searchParams.get('email');
+    const phoneFromUrl = searchParams.get('phone');
+
+    if (nameFromUrl) {
+      setPatient(p => ({ ...p, name: nameFromUrl }));
+      shouldClean = true;
+    }
+    if (emailFromUrl) {
+      setPatient(p => ({ ...p, email: emailFromUrl }));
+      shouldClean = true;
+    }
+    if (phoneFromUrl) {
+      setPatient(p => ({ ...p, phone: phoneFromUrl }));
+      shouldClean = true;
+    }
+
+    // Apply explicit step (overrides calculated step)
+    if (stepFromUrl) {
+      const s = Number(stepFromUrl);
+      if (!isNaN(s) && s >= 1 && s <= 4) {
+        newStep = s;
+      }
+    }
+
+    // Auto-advance: if doctor + date + time are set, go to step 4 (patient info)
+    const docSet = doctorFromUrl && !isNaN(Number(doctorFromUrl)) && doctors.some(d => d.id === Number(doctorFromUrl));
+    const dateSet = dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl);
+    const timeSet = timeFromUrl && time24toDisplay(timeFromUrl) && TIME_SLOTS.includes(time24toDisplay(timeFromUrl));
+    if (docSet && dateSet && timeSet && !stepFromUrl) {
+      newStep = 4;
+    }
+    // If all patient info is also filled, stay on step 4 (user still clicks confirm)
+    // No need to advance further since step 4 is the last input step
+
+    if (newStep !== null) {
+      setStep(newStep);
+    }
+
+    // Clean the URL so refresh doesn't re-apply
+    if (shouldClean) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const calendarDays = useMemo(() => getCalendarDays(calYear, calMonth), [calYear, calMonth]);
   const filteredDoctors = useMemo(

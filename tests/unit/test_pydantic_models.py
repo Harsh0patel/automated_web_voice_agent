@@ -9,12 +9,12 @@ class TestAudioTranscriptionRequest:
     """Tests for AudioTranscriptionRequest model."""
 
     def test_default_format(self):
-        from backend.core.pydantic_models import AudioTranscriptionRequest
+        from backend.schemas.pydantic_models import AudioTranscriptionRequest
         req = AudioTranscriptionRequest()
         assert req.audio_format == "wav"
 
     def test_custom_format(self):
-        from backend.core.pydantic_models import AudioTranscriptionRequest
+        from backend.schemas.pydantic_models import AudioTranscriptionRequest
         req = AudioTranscriptionRequest(audio_format="mp3")
         assert req.audio_format == "mp3"
 
@@ -23,18 +23,18 @@ class TestTranscriptionResult:
     """Tests for TranscriptionResult model."""
 
     def test_default_is_final(self):
-        from backend.core.pydantic_models import TranscriptionResult
+        from backend.schemas.pydantic_models import TranscriptionResult
         result = TranscriptionResult(text="hello")
         assert result.text == "hello"
         assert result.is_final is True
 
     def test_non_final(self):
-        from backend.core.pydantic_models import TranscriptionResult
+        from backend.schemas.pydantic_models import TranscriptionResult
         result = TranscriptionResult(text="partial", is_final=False)
         assert result.is_final is False
 
     def test_missing_text_raises(self):
-        from backend.core.pydantic_models import TranscriptionResult
+        from backend.schemas.pydantic_models import TranscriptionResult
         with pytest.raises(ValidationError):
             TranscriptionResult()
 
@@ -43,7 +43,7 @@ class TestLLMConfig:
     """Tests for LLMConfig model."""
 
     def test_defaults(self):
-        from backend.core.pydantic_models import LLMConfig
+        from backend.schemas.pydantic_models import LLMConfig
         config = LLMConfig()
         assert config.model == "gpt-4o-mini"
         assert config.system_prompt == ""
@@ -51,7 +51,7 @@ class TestLLMConfig:
         assert config.response_format is None
 
     def test_custom_values(self):
-        from backend.core.pydantic_models import LLMConfig
+        from backend.schemas.pydantic_models import LLMConfig
         config = LLMConfig(
             model="gpt-4",
             system_prompt="Be concise",
@@ -66,14 +66,14 @@ class TestLLMResponse:
     """Tests for LLMResponse model."""
 
     def test_minimal(self):
-        from backend.core.pydantic_models import LLMResponse
+        from backend.schemas.pydantic_models import LLMResponse
         resp = LLMResponse(content='{"key": "value"}')
         assert resp.content == '{"key": "value"}'
         assert resp.raw_json is None
         assert resp.model == ""
 
     def test_full(self):
-        from backend.core.pydantic_models import LLMResponse
+        from backend.schemas.pydantic_models import LLMResponse
         resp = LLMResponse(
             content='{"key": "value"}',
             raw_json={"key": "value"},
@@ -87,7 +87,7 @@ class TestAudioProcessingResult:
     """Tests for AudioProcessingResult model."""
 
     def test_creation(self):
-        from backend.core.pydantic_models import (
+        from backend.schemas.pydantic_models import (
             AudioProcessingResult,
             LLMResponse,
         )

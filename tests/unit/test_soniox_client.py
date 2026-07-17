@@ -12,7 +12,7 @@ class TestTranscribeAudio:
     @pytest.mark.asyncio
     async def test_transcribe_success(self, sample_audio_bytes, mock_soniox_client):
         """Successful transcription should return the transcript text."""
-        from backend.LLM_CLIENT.soniox_client import transcribe_audio
+        from backend.clients.speech.soniox import transcribe_audio
 
         result = await transcribe_audio(sample_audio_bytes, audio_format="wav")
 
@@ -22,7 +22,7 @@ class TestTranscribeAudio:
     @pytest.mark.asyncio
     async def test_transcribe_calls_client_with_file(self, sample_audio_bytes, mock_soniox_client):
         """The client should be called with the temp file path."""
-        from backend.LLM_CLIENT.soniox_client import transcribe_audio
+        from backend.clients.speech.soniox import transcribe_audio
 
         await transcribe_audio(sample_audio_bytes, audio_format="wav")
 
@@ -37,11 +37,11 @@ class TestTranscribeAudio:
     async def test_transcribe_raises_without_api_key(self, monkeypatch, sample_audio_bytes):
         """Without SONIOX_API_KEY, should raise ValueError."""
         # Directly override config value without reloading
-        import backend.core.config as cfg
+        import backend.app.config as cfg
         original_key = cfg.SONIOX_API_KEY
         cfg.SONIOX_API_KEY = ""
 
-        from backend.LLM_CLIENT.soniox_client import transcribe_audio
+        from backend.clients.speech.soniox import transcribe_audio
 
         try:
             with pytest.raises(ValueError, match="SONIOX_API_KEY is not set"):
@@ -57,7 +57,7 @@ class TestTranscribeAudio:
             side_effect=RuntimeError("Soniox API error")
         )
 
-        from backend.LLM_CLIENT.soniox_client import transcribe_audio
+        from backend.clients.speech.soniox import transcribe_audio
 
         with pytest.raises(RuntimeError, match="Soniox API error"):
             await transcribe_audio(sample_audio_bytes)
@@ -65,7 +65,7 @@ class TestTranscribeAudio:
     @pytest.mark.asyncio
     async def test_transcribe_cleans_up_temp_file(self, sample_audio_bytes, mock_soniox_client):
         """Temp files should be cleaned up after transcription."""
-        from backend.LLM_CLIENT.soniox_client import transcribe_audio
+        from backend.clients.speech.soniox import transcribe_audio
 
         # Verify no errors during cleanup
         result = await transcribe_audio(sample_audio_bytes, audio_format="wav")

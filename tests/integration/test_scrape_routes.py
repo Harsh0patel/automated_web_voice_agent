@@ -27,9 +27,9 @@ class TestScrapeEndpoint:
         response = client.post("/scrape")
         assert response.status_code == 422
 
-    @patch("backend.routes.scrape.scrape_url")
-    @patch("backend.routes.scrape.db.store_components")
-    @patch("backend.routes.scrape.db.store_page")
+    @patch("backend.api.routes.scrape.scrape_url")
+    @patch("backend.api.routes.scrape.db.store_components")
+    @patch("backend.api.routes.scrape.db.store_page")
     def test_scrape_success(self, mock_store_page, mock_store_components, mock_scrape_url, client):
         """Successful scrape should store the page and parse components."""
         mock_scrape_url.return_value = {
@@ -55,7 +55,7 @@ class TestScrapeEndpoint:
         mock_store_page.assert_called_once()
         mock_store_components.assert_called_once()
 
-    @patch("backend.routes.scrape.scrape_url")
+    @patch("backend.api.routes.scrape.scrape_url")
     def test_scrape_error_propagates(self, mock_scrape_url, app):
         """Errors during scraping should return 500."""
         from fastapi.testclient import TestClient
@@ -69,7 +69,7 @@ class TestScrapeEndpoint:
 class TestListPagesEndpoint:
     """Tests for GET /pages endpoint."""
 
-    @patch("backend.routes.scrape.db.get_all_pages")
+    @patch("backend.api.routes.scrape.db.get_all_pages")
     def test_list_empty(self, mock_get_all, client):
         """GET /pages should return empty list when no pages."""
         mock_get_all.return_value = []
@@ -81,7 +81,7 @@ class TestListPagesEndpoint:
         assert data["pages"] == []
         assert data["count"] == 0
 
-    @patch("backend.routes.scrape.db.get_all_pages")
+    @patch("backend.api.routes.scrape.db.get_all_pages")
     def test_list_with_pages(self, mock_get_all, client):
         """GET /pages should return stored pages."""
         mock_get_all.return_value = [
@@ -97,7 +97,7 @@ class TestListPagesEndpoint:
         assert data["count"] == 2
         assert data["pages"][0]["title"] == "Page A"
 
-    @patch("backend.routes.scrape.db.get_all_pages")
+    @patch("backend.api.routes.scrape.db.get_all_pages")
     def test_list_db_error(self, mock_get_all, app):
         """Database errors should return 500."""
         from fastapi.testclient import TestClient
@@ -111,7 +111,7 @@ class TestListPagesEndpoint:
 class TestDeletePagesEndpoint:
     """Tests for DELETE /pages endpoint."""
 
-    @patch("backend.routes.scrape.db.delete_all_pages")
+    @patch("backend.api.routes.scrape.db.delete_all_pages")
     def test_delete_success(self, mock_delete, client):
         """DELETE /pages should clear all pages."""
         mock_delete.return_value = 3
@@ -123,7 +123,7 @@ class TestDeletePagesEndpoint:
         assert data["deleted"] == 3
         assert "Deleted 3 pages" in data["message"]
 
-    @patch("backend.routes.scrape.db.delete_all_pages")
+    @patch("backend.api.routes.scrape.db.delete_all_pages")
     def test_delete_empty(self, mock_delete, client):
         """DELETE /pages with no pages should return 0."""
         mock_delete.return_value = 0
@@ -138,8 +138,8 @@ class TestDeletePagesEndpoint:
 class TestComponentEndpoints:
     """Tests for the component registry API endpoints."""
 
-    @patch("backend.routes.scrape.db.get_all_components")
-    @patch("backend.routes.scrape.db.get_component_types")
+    @patch("backend.api.routes.scrape.db.get_all_components")
+    @patch("backend.api.routes.scrape.db.get_component_types")
     def test_list_components_empty(self, mock_types, mock_components, client):
         """GET /components should return empty list initially."""
         mock_components.return_value = []
@@ -153,8 +153,8 @@ class TestComponentEndpoints:
         assert data["count"] == 0
         assert data["types"] == []
 
-    @patch("backend.routes.scrape.db.get_all_components")
-    @patch("backend.routes.scrape.db.get_component_types")
+    @patch("backend.api.routes.scrape.db.get_all_components")
+    @patch("backend.api.routes.scrape.db.get_component_types")
     def test_list_components_with_data(self, mock_types, mock_components, client):
         """GET /components should return stored components."""
         mock_components.return_value = [
@@ -172,7 +172,7 @@ class TestComponentEndpoints:
         assert "service" in data["types"]
         assert data["components"][0]["type"] == "service"
 
-    @patch("backend.routes.scrape.db.get_component_types")
+    @patch("backend.api.routes.scrape.db.get_component_types")
     def test_component_types(self, mock_types, client):
         """GET /components/types should return distinct types."""
         mock_types.return_value = ["service", "doctor", "faq"]
@@ -184,7 +184,7 @@ class TestComponentEndpoints:
         assert len(data["types"]) == 3
         assert data["count"] == 3
 
-    @patch("backend.routes.scrape.db.search_components")
+    @patch("backend.api.routes.scrape.db.search_components")
     def test_search_components(self, mock_search, client):
         """GET /components/search should return matching components."""
         mock_search.return_value = [
@@ -198,7 +198,7 @@ class TestComponentEndpoints:
         assert len(data["results"]) == 1
         assert data["results"][0]["type"] == "doctor"
 
-    @patch("backend.routes.scrape.db.delete_all_components")
+    @patch("backend.api.routes.scrape.db.delete_all_components")
     def test_delete_components(self, mock_delete, client):
         """DELETE /components should clear all components."""
         mock_delete.return_value = 10
@@ -209,12 +209,14 @@ class TestComponentEndpoints:
         assert response.status_code == 200
         assert data["deleted"] == 10
 
-    @patch("backend.routes.scrape.db.delete_all_pages")
-    @patch("backend.routes.scrape.db.delete_all_components")
-    def test_delete_all(self, mock_components, mock_pages, client):
+    @patch("backend.api.routes.scrape.db.delete_all_pages")
+    @patch("backend.api.routes.scrape.db.delete_all_components")
+    @patch("backend.api.routes.scrape.db.delete_all_page_analysis")
+    def test_delete_all(self, mock_analysis, mock_components, mock_pages, client):
         """DELETE /all should clear everything."""
         mock_pages.return_value = 3
         mock_components.return_value = 15
+        mock_analysis.return_value = 8
 
         response = client.delete("/all")
         data = response.json()
@@ -222,3 +224,4 @@ class TestComponentEndpoints:
         assert response.status_code == 200
         assert data["pages_deleted"] == 3
         assert data["components_deleted"] == 15
+        assert data["analysis_deleted"] == 8

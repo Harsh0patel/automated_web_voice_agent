@@ -1,65 +1,33 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import useScrapedComponents from '../hooks/useScrapedComponents.js';
 import './Services.css';
 
-const services = [
-  {
-    icon: '🚑',
-    title: 'Emergency Care',
-    desc: '24/7 emergency medical services with rapid response teams, advanced life support, and trauma care facilities.',
-    features: ['Immediate Triage', 'Trauma Care', 'Ambulance Services', 'Critical Care Unit'],
-  },
-  {
-    icon: '❤️',
-    title: 'Cardiology',
-    desc: 'Comprehensive heart care including diagnostics, interventional cardiology, and cardiac rehabilitation programs.',
-    features: ['Echocardiography', 'Angioplasty', 'Heart Surgery', 'Cardiac Rehab'],
-  },
-  {
-    icon: '🧠',
-    title: 'Neurology',
-    desc: 'Expert diagnosis and treatment of disorders affecting the brain, spinal cord, and nervous system.',
-    features: ['Brain Imaging', 'Stroke Care', 'Epilepsy Treatment', 'Neuro Surgery'],
-  },
-  {
-    icon: '🦴',
-    title: 'Orthopedics',
-    desc: 'Complete care for musculoskeletal conditions, from sports injuries to joint replacements.',
-    features: ['Joint Replacement', 'Sports Medicine', 'Spine Surgery', 'Physical Therapy'],
-  },
-  {
-    icon: '👶',
-    title: 'Pediatrics',
-    desc: 'Family-centered healthcare for infants, children, and adolescents in a welcoming environment.',
-    features: ['Well-child Visits', 'Vaccinations', 'Developmental Screenings', 'Pediatric ICU'],
-  },
-  {
-    icon: '🔬',
-    title: 'Diagnostic Imaging',
-    desc: 'State-of-the-art imaging technology for accurate diagnosis and treatment planning.',
-    features: ['MRI & CT Scans', 'Ultrasound', 'X-Ray', 'PET Scans'],
-  },
-  {
-    icon: '🫁',
-    title: 'Pulmonology',
-    desc: 'Specialized care for respiratory conditions affecting the lungs and breathing.',
-    features: ['Pulmonary Function', 'Bronchoscopy', 'Sleep Studies', 'Asthma Management'],
-  },
-  {
-    icon: '🧬',
-    title: 'Oncology',
-    desc: 'Comprehensive cancer care with advanced treatment options and supportive services.',
-    features: ['Chemotherapy', 'Radiation Therapy', 'Immunotherapy', 'Cancer Screening'],
-  },
-  {
-    icon: '👁️',
-    title: 'Ophthalmology',
-    desc: 'Complete eye care services from routine exams to advanced surgical procedures.',
-    features: ['Cataract Surgery', 'Glaucoma Care', 'LASIK', 'Retina Treatment'],
-  },
+// ── Fallback data ──
+const FALLBACK_SERVICES = [
+  { icon: '🚑', title: 'Emergency Care', desc: '24/7 emergency medical services.', features: ['Immediate Triage', 'Trauma Care', 'Ambulance Services', 'Critical Care Unit'] },
+  { icon: '❤️', title: 'Cardiology', desc: 'Comprehensive heart care.', features: ['Echocardiography', 'Angioplasty', 'Heart Surgery', 'Cardiac Rehab'] },
+  { icon: '🧠', title: 'Neurology', desc: 'Expert neurological care.', features: ['Brain Imaging', 'Stroke Care', 'Epilepsy Treatment', 'Neuro Surgery'] },
+  { icon: '🦴', title: 'Orthopedics', desc: 'Complete musculoskeletal care.', features: ['Joint Replacement', 'Sports Medicine', 'Spine Surgery', 'Physical Therapy'] },
+  { icon: '👶', title: 'Pediatrics', desc: 'Family-centered healthcare for children.', features: ['Well-child Visits', 'Vaccinations', 'Developmental Screenings', 'Pediatric ICU'] },
+  { icon: '🔬', title: 'Diagnostic Imaging', desc: 'Advanced imaging technology.', features: ['MRI & CT Scans', 'Ultrasound', 'X-Ray', 'PET Scans'] },
+  { icon: '🫁', title: 'Pulmonology', desc: 'Respiratory condition care.', features: ['Pulmonary Function', 'Bronchoscopy', 'Sleep Studies', 'Asthma Management'] },
+  { icon: '🧬', title: 'Oncology', desc: 'Comprehensive cancer care.', features: ['Chemotherapy', 'Radiation Therapy', 'Immunotherapy', 'Cancer Screening'] },
+  { icon: '👁️', title: 'Ophthalmology', desc: 'Complete eye care services.', features: ['Cataract Surgery', 'Glaucoma Care', 'LASIK', 'Retina Treatment'] },
 ];
 
 export default function Services() {
+  const { byType } = useScrapedComponents();
+
+  const scrapedServices = byType('service');
+  const services = scrapedServices.length > 0
+    ? scrapedServices.map(s => ({
+        icon: s.metadata?.attributes?.icon || '🔬',
+        title: s.content,
+        desc: s.metadata?.description || '',
+        features: s.metadata?.attributes?.features || [],
+      }))
+    : FALLBACK_SERVICES;
   return (
     <>
       {/* ========== PAGE HEADER ========== */}

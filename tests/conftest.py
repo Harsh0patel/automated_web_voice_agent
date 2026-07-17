@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import WebSocket
 
-from backend.main import app as fastapi_app
+from backend.app.main import app as fastapi_app
 
 
 # ============================================================
@@ -21,7 +21,7 @@ def _mock_env_vars(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
     monkeypatch.setenv("ELEVENLABS_API_KEY", "test-elevenlabs-key")
     # Force reload of config module values
-    import backend.core.config as cfg
+    import backend.app.config as cfg
     cfg.SONIOX_API_KEY = "test-soniox-key"
     cfg.OPENAI_API_KEY = "test-openai-key"
     cfg.GROQ_API_KEY = "test-groq-key"
@@ -51,8 +51,8 @@ def client(app):
 
 @pytest.fixture
 def mock_soniox_client():
-    """Mock the AsyncSonioxClient (legacy — kept for Soniox-based tests)."""
-    with patch("backend.LLM_CLIENT.soniox_client.AsyncSonioxClient") as mock:
+    """Mock the AsyncSonioxClient."""
+    with patch("backend.clients.speech.soniox.AsyncSonioxClient") as mock:
         instance = mock.return_value
         instance.stt.transcribe_and_wait_with_tokens = AsyncMock()
         mock_transcript = MagicMock()
@@ -65,9 +65,8 @@ def mock_soniox_client():
 @pytest.fixture
 def mock_groq_client():
     """Mock the Groq client (used for STT via Whisper)."""
-    with patch("backend.LLM_CLIENT.groq_client.Groq") as mock:
+    with patch("backend.clients.llm.groq.Groq") as mock:
         instance = mock.return_value
-        # Mock audio.transcriptions.create to return a fake transcription
         mock_transcription = MagicMock()
         mock_transcription.text = "This is a test transcription from Groq."
         instance.audio.transcriptions.create = MagicMock(return_value=mock_transcription)
@@ -77,9 +76,8 @@ def mock_groq_client():
 @pytest.fixture
 def mock_elevenlabs_client():
     """Mock the ElevenLabs client (used for TTS)."""
-    with patch("backend.LLM_CLIENT.elevenlabs_client.ElevenLabs") as mock:
+    with patch("backend.clients.speech.elevenlabs.ElevenLabs") as mock:
         instance = mock.return_value
-        # Mock text_to_speech.convert to return fake audio bytes
         instance.text_to_speech.convert = MagicMock(return_value=[b"fake_audio_data"])
         yield mock
 
@@ -91,18 +89,13 @@ def mock_elevenlabs_client():
 @pytest.fixture
 def mock_openai_client():
     """Mock the AsyncOpenAI client and its chat completions."""
-    with patch("backend.LLM_CLIENT.openai_client.AsyncOpenAI") as mock:
+    with patch("backend.clients.llm.openai.AsyncOpenAI") as mock:
         instance = mock.return_value
-
-        # Create a mock response
         mock_choice = MagicMock()
         mock_choice.message.content = '{"message": "This is a test response from the LLM."}'
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
-
-        # Set up the chat completions chain
         instance.chat.completions.create = AsyncMock(return_value=mock_response)
-
         yield mock
 
 
@@ -142,7 +135,7 @@ def sample_audio_bytes():
 def disable_mongo():
     """Make _get_client return None so DB functions degrade gracefully."""
     from unittest.mock import patch
-    with patch("backend.core.database._get_client", return_value=None):
+    with patch("backend.app.database._get_client", return_value=None):
         yield
 
 

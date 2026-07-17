@@ -11,14 +11,14 @@ class TestConnectionManager:
 
     def test_init_empty_connections(self):
         """A new ConnectionManager should have no active connections."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
         assert mgr.active_connections == []
 
     @pytest.mark.asyncio
     async def test_connect_adds_websocket(self, mock_websocket):
         """connect() should accept and add the websocket."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
 
         await mgr.connect(mock_websocket)
@@ -30,7 +30,7 @@ class TestConnectionManager:
     @pytest.mark.asyncio
     async def test_disconnect_removes_websocket(self, mock_websocket):
         """disconnect() should remove the websocket from active connections."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
         await mgr.connect(mock_websocket)
         assert len(mgr.active_connections) == 1
@@ -42,7 +42,7 @@ class TestConnectionManager:
     @pytest.mark.asyncio
     async def test_disconnect_nonexistent_does_nothing(self, mock_websocket):
         """Disconnecting a websocket not in the list should not raise."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
 
         mgr.disconnect(mock_websocket)  # Should not raise
@@ -51,7 +51,7 @@ class TestConnectionManager:
     @pytest.mark.asyncio
     async def test_send_json(self, mock_websocket):
         """send_json should delegate to websocket.send_json."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
         data = {"type": "test", "key": "value"}
 
@@ -62,7 +62,7 @@ class TestConnectionManager:
     @pytest.mark.asyncio
     async def test_connect_multiple(self, mock_websocket):
         """Multiple websockets can be connected simultaneously."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
         ws2 = AsyncMock()
         ws3 = AsyncMock()
@@ -76,7 +76,7 @@ class TestConnectionManager:
     @pytest.mark.asyncio
     async def test_broadcast_sends_to_all(self):
         """broadcast() should send a message to all connected clients."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
         ws1 = AsyncMock()
         ws2 = AsyncMock()
@@ -91,7 +91,7 @@ class TestConnectionManager:
     @pytest.mark.asyncio
     async def test_broadcast_removes_failed_connections(self):
         """broadcast() should remove connections that fail to send."""
-        from backend.routes.websocket import ConnectionManager
+        from backend.api.routes.websocket import ConnectionManager
         mgr = ConnectionManager()
         ws1 = AsyncMock()
         ws2 = AsyncMock()

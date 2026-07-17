@@ -11,7 +11,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_scrape_basic_html(self):
         """Should extract title and content from basic HTML."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         html = """<html><head><title>Test Page</title></head>
         <body><main><h1>Heading</h1><p>This is a paragraph.</p></main></body></html>"""
@@ -34,7 +34,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_scrape_removes_script_tags(self):
         """JavaScript should be removed from the extracted content."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         html = """<html><body><main>
         <p>Visible text</p>
@@ -59,7 +59,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_scrape_extracts_links(self):
         """Anchor tags should be extracted as markdown links."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         html = """<html><body><main>
         <p>Visit <a href="https://example.com/page">this page</a> for more.</p>
@@ -80,7 +80,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_scrape_without_title(self):
         """Should handle pages without a title tag."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         html = "<html><body><main><p>No title here</p></main></body></html>"
 
@@ -99,7 +99,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_invalid_url_rejected(self):
         """Invalid URLs should raise ValueError."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         with pytest.raises(ValueError, match="Invalid URL"):
             await scrape_url("not-a-url")
@@ -107,7 +107,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_invalid_url_no_scheme(self):
         """URLs without scheme should be rejected."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         with pytest.raises(ValueError, match="Invalid URL"):
             await scrape_url("example.com/path")
@@ -115,7 +115,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_http_error_propagates(self):
         """HTTP errors should propagate as exceptions."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock(
@@ -132,7 +132,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_scrape_uses_correct_headers(self):
         """Should send proper browser-like headers."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         html = "<html><body><main><p>Test</p></main></body></html>"
 
@@ -157,7 +157,7 @@ class TestScrapeUrl:
     @pytest.mark.asyncio
     async def test_scrape_returns_metadata(self):
         """Should return metadata including status code."""
-        from backend.core.scraper import scrape_url
+        from backend.scraping.fetcher import scrape_url
 
         html = "<html><body><main><p>Content</p></main></body></html>"
 

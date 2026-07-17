@@ -10,11 +10,11 @@ class TestGetClient:
 
     def test_get_client_returns_none_without_uri(self, monkeypatch):
         """Without MONGO_URI, _get_client should return None (not crash)."""
-        from backend.core import database as db
+        from backend.app import database as db
         # Reset global client to force re-initialization
         db._client = None
 
-        import backend.core.config as cfg
+        import backend.app.config as cfg
         original = cfg.MONGO_URI
         cfg.MONGO_URI = ""
 
@@ -24,10 +24,10 @@ class TestGetClient:
         finally:
             cfg.MONGO_URI = original
 
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     def test_get_client_creates_singleton(self, mock_client_cls):
         """_get_client should create and return a single client instance."""
-        from backend.core import database as db
+        from backend.app import database as db
 
         # Ensure fresh state
         db._client = None
@@ -38,10 +38,10 @@ class TestGetClient:
         assert client1 is client2, "Should return the same instance"
         mock_client_cls.assert_called_once()
 
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     def test_get_db_returns_scraped_data_db(self, mock_client_cls):
         """get_db should return the scraped_data database."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         client = db._get_client()
@@ -49,10 +49,10 @@ class TestGetClient:
 
         assert db_instance is client.scraped_data
 
-    @patch("backend.core.database._client", None)
+    @patch("backend.app.database._client", None)
     def test_cleanup_after_test(self):
         """Ensure global state is reset between tests."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
         assert db._client is None
 
@@ -62,10 +62,10 @@ class TestStorePage:
     """Tests for store_page function."""
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_store_inserts_one(self, mock_client_cls):
         """store_page should insert one document and return its ID."""
-        from backend.core import database as db
+        from backend.app import database as db
 
         db._client = None
         instance = mock_client_cls.return_value
@@ -89,10 +89,10 @@ class TestStorePage:
         assert inserted["metadata"] == {}
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_store_creates_text_index(self, mock_client_cls):
         """store_page should create a text index on pages collection."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         instance = mock_client_cls.return_value
@@ -115,10 +115,10 @@ class TestStorePage:
         assert ("title", "text") in index_spec
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_store_handles_index_error(self, mock_client_cls):
         """If index creation fails, store_page should not crash."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         instance = mock_client_cls.return_value
@@ -160,10 +160,10 @@ class TestSearchPages:
     """Tests for search_pages function."""
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_search_returns_results(self, mock_client_cls):
         """search_pages should return matching documents."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         mock_docs = [
@@ -186,10 +186,10 @@ class TestSearchPages:
         assert results[1]["title"] == "Page B"
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_search_empty_returns_empty(self, mock_client_cls):
         """search_pages should return empty list when no matches."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         mock_cursor = MockAsyncCursor([])
@@ -202,10 +202,10 @@ class TestSearchPages:
         assert results == []
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_search_respects_limit(self, mock_client_cls):
         """search_pages should respect the limit parameter."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         mock_cursor = MockAsyncCursor([])
@@ -227,10 +227,10 @@ class TestGetAllPages:
     """Tests for get_all_pages function."""
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_get_all_returns_pages(self, mock_client_cls):
         """get_all_pages should return all stored pages."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         class MockGetAllCursor:
@@ -270,10 +270,10 @@ class TestDeleteAllPages:
     """Tests for delete_all_pages function."""
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_delete_all(self, mock_client_cls):
         """delete_all_pages should delete all documents."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         instance = mock_client_cls.return_value
@@ -291,10 +291,10 @@ class TestPing:
     """Tests for ping function."""
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_ping_success(self, mock_client_cls):
         """ping should return True when MongoDB is reachable."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         instance = mock_client_cls.return_value
@@ -305,10 +305,10 @@ class TestPing:
         instance.admin.command.assert_awaited_once_with("ping")
 
     @pytest.mark.asyncio
-    @patch("backend.core.database.AsyncIOMotorClient")
+    @patch("backend.app.database.AsyncIOMotorClient")
     async def test_ping_failure(self, mock_client_cls):
         """ping should return False when MongoDB is unreachable."""
-        from backend.core import database as db
+        from backend.app import database as db
         db._client = None
 
         instance = mock_client_cls.return_value

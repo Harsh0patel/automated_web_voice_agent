@@ -24,30 +24,27 @@ A headless FastAPI backend that accepts **audio + text input** via WebSocket, tr
 ## Architecture
 
 ```
-┌─────────────┐    WebSocket     ┌──────────────────────────────────────┐
-│             │ ◄──────────────► │           FastAPI Backend             │
-│   Client    │                  │                                      │
-│ (headless)  │   Binary Audio   │  ┌──────────┐   ┌────────────────┐   │
-│             │ ───────────────► │  │  Soniox  │   │    OpenAI      │   │
-│             │                  │  │   STT    │──►│ (JSON gen)     │   │
-│             │ ◄─────────────── │  └──────────┘   └────────────────┘   │
-│             │   JSON Result    │                                      │
-└─────────────┘                  └──────────────────────────────────────┘
+┌─────────────┐    WebSocket     ┌──────────────────────────────────────────────────┐
+│             │ ◄──────────────► │                  FastAPI Backend                    │
+│   Client    │                  │                                                      │
+│  (Browser)  │  Text / Audio    │  ┌──────────┐   ┌──────────────┐   ┌─────────────┐ │
+│             │ ───────────────► │  │  Groq    │   │   LLM (any   │   │  ElevenLabs  │ │
+│             │                  │  │  STT     │──►│   OpenAI-    │──►│   TTS        │ │
+│             │ ◄─────────────── │  └──────────┘   │   compatible │   └─────────────┘ │
+│             │  TTS Audio +     │                  └──────────────┘                   │
+│             │  JSON Response   │  + MongoDB (memory + component registry)            │
+└─────────────┘                  └──────────────────────────────────────────────────┘
 ```
 
-**Data flow for audio:**
-1. Client connects to `ws://<host>:8000/ws`
-2. Client sends audio (binary chunks or base64 in JSON)
-3. Server transcribes audio via **Soniox** Speech-to-Text
-4. Server passes transcript to **OpenAI** with a system prompt
-5. OpenAI returns a structured JSON response
-6. Server sends the JSON result back through the WebSocket
-
-**Data flow for text:**
-1. Client sends `{"type": "chat", "content": "..."}`
-2. Server sends the text directly to OpenAI
-3. OpenAI returns a JSON response
-4. Server sends the result back through the WebSocket
+**Pipeline:**
+1. Client connects to `ws://localhost:8000/ws`
+2. Sends text (chat) or audio (binary chunks / base64)
+3. Server searches the **Component Registry** (MongoDB) for relevant context
+4. Retrieves **Conversation Memory** for the session
+5. Sends everything to the **LLM** with a system prompt loaded from `backend/prompts/`
+6. LLM returns a JSON response with message + optional actions (navigate, scroll, fill, submit, etc.)
+7. Server synthesizes **TTS audio** via ElevenLabs
+8. Sends audio bytes + JSON result back through the WebSocket
 
 ---
 
@@ -87,24 +84,25 @@ cp .env.example .env
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `SONIOX_API_KEY` | Yes | — | Soniox speech-to-text API key |
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key |
-| `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OPENAI_API_KEY` | Yes | — | OpenAI / compatible API key |
+| `OPENAI_BASE_URL` | No | `https://api.openai.com/v1` | OpenAI-compatible base URL |
+| `OPENAI_MODEL` | No | `gpt-4o-mini` | LLM model name |
+| `GROQ_API_KEY` | No | — | Groq Whisper STT key (audio input) |
+| `ELEVENLABS_API_KEY` | No | — | ElevenLabs TTS key (voice output) |
+| `MONGO_URI` | No | `mongodb://localhost:27017` | MongoDB URI (memory + components) |
 
-### System Prompt
+### System Prompts
 
-The prompt sent to OpenAI is stored in a separate file:
+Prompts are stored as plain `.txt` files in `backend/prompts/`:
 
-```
-backend/core/prompts/system_prompt.txt
-```
+| File | Purpose |
+|---|---|
+| `default_system_prompt.txt` | Main AI assistant prompt (fallback) |
+| `summarize_prompt.txt` | Conversation memory summarizer |
 
-Edit this file to customize how the LLM processes transcripts. If left empty, a default prompt is used.
-
-**Example prompt:**
-```
-You are a voice assistant. Extract actionable items from the transcript and return them as a JSON array under the key "actions".
-```
+Edit these files to customize the assistant's behavior.
 
 ---
 
@@ -112,7 +110,7 @@ You are a voice assistant. Extract actionable items from the transcript and retu
 
 ```bash
 # Start the server (hot-reload enabled)
-uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The server will start at `http://localhost:8000`.
@@ -286,18 +284,37 @@ All errors follow this format:
 │   └── ci.yml                 # GitHub Actions CI
 │
 ├── backend/
-│   ├── main.py                # FastAPI app entry point
-│   ├── core/
+│   ├── app/
+│   │   ├── main.py            # FastAPI app entry point
 │   │   ├── config.py          # Environment variable config
-│   │   ├── pydantic_models.py # Data models
-│   │   └── prompts/
-│   │       └── system_prompt.txt  # LLM system prompt (editable)
-│   ├── LLM_CLIENT/
-│   │   ├── soniox_client.py   # Soniox STT client
-│   │   └── openai_client.py   # OpenAI LLM client
-│   └── routes/
-│       ├── homepage.py        # REST routes (/, /health)
-│       └── websocket.py       # WebSocket route (/ws)
+│   │   ├── database.py        # MongoDB connection + queries
+│   │   └── logger.py          # Logging configuration
+│   ├── api/routes/
+│   │   ├── homepage.py        # REST routes (/, /health)
+│   │   ├── scrape.py          # Scraping + component endpoints
+│   │   └── websocket.py       # WebSocket route (/ws)
+│   ├── clients/
+│   │   ├── llm/
+│   │   │   ├── openai.py      # OpenAI-compatible LLM client
+│   │   │   └── groq.py        # Groq Whisper STT client
+│   │   └── speech/
+│   │       ├── elevenlabs.py  # ElevenLabs TTS client
+│   │       └── soniox.py      # Soniox STT client (fallback)
+│   ├── memory/
+│   │   ├── manager.py         # MemoryManager (buffer + MongoDB)
+│   │   ├── models.py          # MemoryEntry, ConversationSummary
+│   │   └── summarizer.py      # Async LLM call for summarization
+│   ├── scraping/
+│   │   ├── browser.py         # Playwright-based site scraper
+│   │   ├── fetcher.py         # HTTP-based page fetcher
+│   │   ├── parser.py          # Component parser (typed extraction)
+│   │   ├── prompt_generator.py# Dynamic system prompt builder
+│   │   └── site_config.py     # Site configuration loader
+│   ├── schemas/
+│   │   └── pydantic_models.py # Data models
+│   └── prompts/
+│       ├── default_system_prompt.txt  # Main AI assistant prompt
+│       └── summarize_prompt.txt       # Memory summarizer prompt
 │
 ├── tests/
 │   ├── conftest.py            # Shared fixtures & mocks
@@ -326,7 +343,7 @@ All errors follow this format:
 
 ## Testing
 
-The project has **77 tests** across three levels.
+The project has **208 tests** across three levels.
 
 ### Running All Tests
 
@@ -354,9 +371,9 @@ uv run pytest tests/unit/test_openai_client.py -v
 
 | Level | Count | What it tests |
 |---|---|---|
-| **Unit** | 49 | Individual functions/classes in isolation. External APIs (Soniox, OpenAI) are mocked. |
-| **Integration** | 19 | WebSocket routes with mocked external services, REST API responses. |
-| **End-to-End** | 6 | Full audio pipeline, error handling, mixed text/audio flows. All external APIs mocked. |
+| **Unit** | 160 | Individual functions/classes in isolation. External APIs (Soniox, OpenAI) are mocked. |
+| **Integration** | 34 | WebSocket routes with mocked external services, REST API responses. |
+| **End-to-End** | 14 | Full audio pipeline, error handling, mixed text/audio flows. All external APIs mocked. |
 
 Tests use:
 - **pytest** — test runner
@@ -408,7 +425,7 @@ import asyncio
 import json
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from backend.app.main import app
 
 async def demo():
     client = TestClient(app)
